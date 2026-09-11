@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 27640 --var AUTH_MODE:dev",
+    "dev:workos": "set -a; . ./.env; set +a; wrangler dev --port 27640",
+    "dev:proxy": "node ../apps/web/dev-proxy.mjs",
     "deploy": "wrangler deploy",
     "build": "wrangler deploy --dry-run --outdir dist",
     "typecheck": "tsc --noEmit",

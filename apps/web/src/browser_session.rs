@@ -199,9 +199,25 @@ mod browser {
 
         async fn run(self: Rc<Self>, cx: &mut gpui::AsyncApp) {
             self.start_check(cx);
+            let mut next_device_refresh_at = 0.;
             loop {
                 while let Some(action) = self.actions.borrow_mut().pop_front() {
                     self.handle(action, cx);
+                }
+                let waiting_for_device = matches!(
+                    &*self.screen.borrow(),
+                    Screen::Devices(devices) if devices.iter().all(|device| !device.online)
+                );
+                if waiting_for_device {
+                    let now = js_sys::Date::now();
+                    if next_device_refresh_at == 0. {
+                        next_device_refresh_at = now + 1_000.;
+                    } else if now >= next_device_refresh_at {
+                        self.queue(Action::Check);
+                        next_device_refresh_at = now + 1_000.;
+                    }
+                } else {
+                    next_device_refresh_at = 0.;
                 }
                 cx.background_executor()
                     .timer(Duration::from_millis(50))
