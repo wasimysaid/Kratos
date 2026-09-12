@@ -29,6 +29,8 @@ pub mod frost;
 mod goal;
 pub mod history;
 pub mod icons;
+pub(crate) mod image_media;
+pub(crate) mod image_viewer;
 pub mod links;
 pub mod loaders;
 pub mod markdown;
