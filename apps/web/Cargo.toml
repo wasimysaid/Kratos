@@ -15,7 +15,7 @@ zeron-proto = { path = "../../crates/proto" }
 zeron-rpc = { path = "../../crates/rpc", default-features = false, features = ["client"] }
 gpui = { git = "https://github.com/Gratenes/zui", rev = "53f49068b7aa2b796360e640b2635dbabba9c032" }
 gpui_platform = { git = "https://github.com/Gratenes/zui", rev = "53f49068b7aa2b796360e640b2635dbabba9c032" }
-web-sys = { version = "0.3", features = ["Window", "Document", "Element", "Node", "HtmlElement", "Location", "WebSocket", "BinaryType", "MessageEvent", "Event", "CloseEvent", "ErrorEvent", "Request", "RequestInit", "RequestCredentials", "Response", "Headers", "AbortController", "AbortSignal"] }
+web-sys = { version = "0.3", features = ["Window", "Document", "Element", "Node", "HtmlElement", "Location", "WebSocket", "BinaryType", "MessageEvent", "Event", "Request", "RequestInit", "RequestCredentials", "Response", "Headers", "AbortController", "AbortSignal"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"

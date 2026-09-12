@@ -8,4 +8,4 @@ Use the pinned GPUI dependencies in `Cargo.toml` to build for `wasm32-unknown-un
 
 ## Tests
 
-Run the lifecycle crate's Rust tests and the edge browser-session/device discovery workerd tests before publishing assets or deploying the edge worker.
+The lifecycle crate has seven focused tests covering the active browser session coordinator, typed DeviceRoom connection, and shared engine attachment. Run them together with the edge browser-session/device discovery workerd tests before publishing assets or deploying the edge worker.
