@@ -304,6 +304,7 @@ impl MarkdownPreview {
                     cx,
                     Self::cancel_comment,
                     Self::commit_comment,
+                    column,
                 ));
             }
         }
@@ -1146,52 +1147,54 @@ impl MarkdownPreview {
                     div()
                         .w_full()
                         .flex()
-                        .justify_center()
-                        .px(px(24.0))
+                        .flex_col()
                         .pb(px(render::MD_BLOCK_GAP))
                         // Include the comment gutter so moving from the block to
                         // its button never leaves the hover group.
                         .group(group.clone())
                         .child(
-                            div()
-                                .w_full()
-                                .max_w(px(MAX_PREVIEW_CONTENT_WIDTH))
-                                .min_w_0()
-                                .relative()
-                                .when_some(comment_line, |el, line| {
-                                    el.child(
-                                        div()
-                                            .absolute()
-                                            .left(px(-20.0))
-                                            .top(px(3.0))
-                                            .opacity(0.0)
-                                            .group_hover(group, |style| style.opacity(1.0))
-                                            .child(crate::comment_ui::render_comment_adder(
-                                                format!("{}-comment-add-{ix}", self.scope).into(),
-                                                &theme,
-                                                cx,
-                                                move |this, window, cx| {
-                                                    this.open_comment(
-                                                        line,
-                                                        &comment_source,
-                                                        window,
-                                                        cx,
-                                                    )
-                                                },
-                                            )),
-                                    )
-                                })
-                                .child(render::render_block(
-                                    &top.block,
-                                    ix,
-                                    ix,
-                                    &opts,
-                                    &theme,
-                                    window,
-                                    self.highlights.get(&ix).map(|h| h.lines.as_slice()),
-                                ))
-                                .children(comments),
+                            div().w_full().flex().justify_center().px(px(24.0)).child(
+                                div()
+                                    .w_full()
+                                    .max_w(px(MAX_PREVIEW_CONTENT_WIDTH))
+                                    .min_w_0()
+                                    .relative()
+                                    .when_some(comment_line, |el, line| {
+                                        el.child(
+                                            div()
+                                                .absolute()
+                                                .left(px(-20.0))
+                                                .top(px(3.0))
+                                                .opacity(0.0)
+                                                .group_hover(group, |style| style.opacity(1.0))
+                                                .child(crate::comment_ui::render_comment_adder(
+                                                    format!("{}-comment-add-{ix}", self.scope)
+                                                        .into(),
+                                                    &theme,
+                                                    cx,
+                                                    move |this, window, cx| {
+                                                        this.open_comment(
+                                                            line,
+                                                            &comment_source,
+                                                            window,
+                                                            cx,
+                                                        )
+                                                    },
+                                                )),
+                                        )
+                                    })
+                                    .child(render::render_block(
+                                        &top.block,
+                                        ix,
+                                        ix,
+                                        &opts,
+                                        &theme,
+                                        window,
+                                        self.highlights.get(&ix).map(|h| h.lines.as_slice()),
+                                    )),
+                            ),
                         )
+                        .children(comments)
                         .into_any_element(),
                 )
             })
