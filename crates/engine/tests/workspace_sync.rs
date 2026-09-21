@@ -10,14 +10,14 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 
-use zeron_doc::{CommandBasedOn, SessionCommandEntry, SessionCommandPayload, SessionCommandStatus};
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_harness::{Harness, HarnessError, RunControls};
-use zeron_proto::{
+use kratos_doc::{CommandBasedOn, SessionCommandEntry, SessionCommandPayload, SessionCommandStatus};
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_harness::{Harness, HarnessError, RunControls};
+use kratos_proto::{
     AgentEvent, ChatConfig, DoneStatus, HarnessId, Model, ReasoningLevel, RunRequest, SandboxLevel,
     SessionStatus, SteeringMode,
 };
-use zeron_rpc::methods;
+use kratos_rpc::methods;
 
 const VIEWER: &str = "viewer-device";
 
@@ -117,8 +117,8 @@ fn assemble(dir: &std::path::Path, device_id: &str) -> EngineCore {
 async fn bridge(
     a: &EngineCore,
     b: &EngineCore,
-) -> zeron_sync::registry::mock_server::MockRegistryServer {
-    let server = zeron_sync::registry::mock_server::MockRegistryServer::start().await;
+) -> kratos_sync::registry::mock_server::MockRegistryServer {
+    let server = kratos_sync::registry::mock_server::MockRegistryServer::start().await;
     a.workspace.connect_registry_url(&server.url());
     b.workspace.connect_registry_url(&server.url());
     server
@@ -220,8 +220,8 @@ async fn two_engines_share_a_workspace() {
 
     // CreateSpace + CreateChat on A (Mutate over the real RPC surface), hosted
     // by dev-a via the space.
-    let client_a = zeron_rpc::memory_client(a.rpc_service());
-    let client_b = zeron_rpc::memory_client(b.rpc_service());
+    let client_a = kratos_rpc::memory_client(a.rpc_service());
+    let client_b = kratos_rpc::memory_client(b.rpc_service());
     client_a
         .call(
             methods::MUTATE,
@@ -421,7 +421,7 @@ async fn projectless_claim_syncs_after_offline_creation_and_survives_viewer_rest
 async fn claim_resolves_a_worktree_cwd_to_the_repo_root_space() {
     let dir = tempfile::tempdir().unwrap();
     let core = assemble(dir.path(), "dev-a");
-    let client = zeron_rpc::memory_client(core.rpc_service());
+    let client = kratos_rpc::memory_client(core.rpc_service());
 
     // A checkout with a linked worktree — fs layout only; the claim path
     // reads `.git` without spawning git.
@@ -571,7 +571,7 @@ async fn chat_config_selects_the_run_harness() {
         || {
             handle.doc().read_entries().unwrap_or_default().iter().any(|e| {
                 e.parts.iter().any(
-                    |p| matches!(p, zeron_doc::MessagePart::Text { text, .. } if text == "From cursor"),
+                    |p| matches!(p, kratos_doc::MessagePart::Text { text, .. } if text == "From cursor"),
                 )
             })
         },

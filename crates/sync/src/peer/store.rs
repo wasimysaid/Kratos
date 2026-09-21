@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use sha2::Digest as _;
-use zeron_doc::{RegistryRow, RowOp, apply_op};
+use kratos_doc::{RegistryRow, RowOp, apply_op};
 
 pub const MAX_ROW_BYTES: usize = 1024 * 1024;
 pub const MAX_CHAT_ROWS: u64 = 4096;

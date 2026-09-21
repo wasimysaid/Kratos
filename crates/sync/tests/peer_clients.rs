@@ -2,9 +2,9 @@
 //!
 //! These tests deliberately use the real `PeerStore` router and the real
 //! `ChatClient`/`RegistryClient`.  The transport tests install a principal
-//! directly because `zeron-sync` cannot depend on the engine's `AuthStore`
+//! directly because `kratos-sync` cannot depend on the engine's `AuthStore`
 //! without creating a dependency cycle.  Ed25519 pairing and bearer
-//! revocation are covered by `zeron-engine`'s `peer_auth` tests; this file
+//! revocation are covered by `kratos-engine`'s `peer_auth` tests; this file
 //! proves the authenticated principal boundary as seen by the data plane.
 
 use std::path::Path;
@@ -23,11 +23,11 @@ use futures::future::BoxFuture;
 use reqwest::StatusCode;
 use sha2::Digest as _;
 use tempfile::TempDir;
-use zeron_doc::RegistryDoc;
-use zeron_proto::Chat;
-use zeron_sync::chat_client::{ChatClient, ChatDocSink, CheckpointFetcher, RowImportOutcome};
-use zeron_sync::peer::{PeerPrincipal, PeerStore, router};
-use zeron_sync::{RegistryClient, SyncError};
+use kratos_doc::RegistryDoc;
+use kratos_proto::Chat;
+use kratos_sync::chat_client::{ChatClient, ChatDocSink, CheckpointFetcher, RowImportOutcome};
+use kratos_sync::peer::{PeerPrincipal, PeerStore, router};
+use kratos_sync::{RegistryClient, SyncError};
 
 async fn principal(mut req: Request<Body>, next: Next) -> Response {
     // HTTP callers use headers.  WebSocket clients cannot add headers through

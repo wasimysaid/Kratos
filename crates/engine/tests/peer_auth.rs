@@ -23,7 +23,7 @@ impl Drop for Server {
 }
 
 async fn protected_principal(
-    axum::Extension(principal): axum::Extension<zeron_sync::peer::PeerPrincipal>,
+    axum::Extension(principal): axum::Extension<kratos_sync::peer::PeerPrincipal>,
 ) -> axum::Json<serde_json::Value> {
     axum::Json(serde_json::json!({
         "profileId": principal.profile_id,

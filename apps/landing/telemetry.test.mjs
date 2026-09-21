@@ -8,13 +8,13 @@ const source = readFileSync(new URL("./public/telemetry.js", import.meta.url), "
 const html = readFileSync(new URL("./public/index.html", import.meta.url), "utf8");
 const placements = { "nav-download": "nav", "hero-download": "hero", "closing-download": "closing" };
 
-function load({ url = "https://zeron.sh/", referrer = "", navigator = {}, transport, clock = Date } = {}) {
+function load({ url = "https://kratos.sh/", referrer = "", navigator = {}, transport, clock = Date } = {}) {
   const requests = [];
   const links = Object.fromEntries(Object.keys(placements).map((id) => {
     const href = html.match(new RegExp(`id="${id}" href="([^"]+)"`))[1];
     const listeners = {};
     return [id, {
-      href: href === "#downloads" ? "https://zeron.sh/releases/zeron-0.2.10-macos-arm64.dmg" : href,
+      href: href === "#downloads" ? "https://kratos.sh/releases/kratos-0.2.10-macos-arm64.dmg" : href,
       addEventListener: (type, listener) => { listeners[type] = listener; },
       activate(type = "click", button = 0) {
         listeners[type]?.({ button, defaultPrevented: false });
@@ -64,7 +64,7 @@ test("captures one anonymous pageview using the US ingestion endpoint", () => {
   assert.match(request.payload.properties.distinct_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(request.payload.properties.$process_person_profile, false);
   assert.equal(request.payload.properties.$geoip_disable, true);
-  assert.equal(request.payload.properties.$current_url, "https://zeron.sh/");
+  assert.equal(request.payload.properties.$current_url, "https://kratos.sh/");
   assert.equal(request.payload.properties.$referring_domain, "$direct");
 });
 
@@ -129,11 +129,11 @@ for (const [elapsed, rotates] of [[86400000 - 1, false], [86400000, true], [8640
 
 test("drops query strings, fragments, and referrer paths and credentials", () => {
   const { requests } = load({
-    url: "https://zeron.sh/?email=private%40example.invalid#secret",
+    url: "https://kratos.sh/?email=private%40example.invalid#secret",
     referrer: "https://user:password@search.example.invalid/private?token=secret#fragment",
   });
   const properties = requests[0].payload.properties;
-  assert.equal(properties.$current_url, "https://zeron.sh/");
+  assert.equal(properties.$current_url, "https://kratos.sh/");
   assert.equal(properties.$referrer, "https://search.example.invalid/");
   assert.equal(properties.$referring_domain, "search.example.invalid");
   assert.doesNotMatch(requests[0].body, /private|secret|password|user:|fragment/);
@@ -164,7 +164,7 @@ for (const [id, placement] of Object.entries(placements)) {
 }
 
 test("HTML release links need no version lookup or hardcoded asset version", () => {
-  assert.doesNotMatch(html, /zeron-\d+\.\d+\.\d+-macos-arm64\.dmg/);
+  assert.doesNotMatch(html, /kratos-\d+\.\d+\.\d+-macos-arm64\.dmg/);
   assert.doesNotMatch(html, /fetch\([^)]*(manifest\.json|latest\.txt)/);
   for (const id of Object.keys(placements)) {
     assert.equal(load().links[id].href, "https://github.com/wasimysaid/Kratos/releases/latest");
@@ -191,7 +191,7 @@ for (const href of [
   });
 }
 
-for (const url of ["http://localhost:8000/", "https://preview.workers.dev/", "http://zeron.sh/", "https://zeron.sh/private", "https://zeron.sh:8000/"]) {
+for (const url of ["http://localhost:8000/", "https://preview.workers.dev/", "http://kratos.sh/", "https://kratos.sh/private", "https://kratos.sh:8000/"]) {
   test(`does not track development or unexpected URLs: ${url}`, () => {
     const { requests, links } = load({ url });
     links["hero-download"].activate();
@@ -200,7 +200,7 @@ for (const url of ["http://localhost:8000/", "https://preview.workers.dev/", "ht
 }
 
 test("tracks the legacy production hostname", () => {
-  assert.equal(load({ url: "https://comet.zeron.sh/" }).requests.length, 1);
+  assert.equal(load({ url: "https://comet.kratos.sh/" }).requests.length, 1);
 });
 
 for (const navigator of [{ doNotTrack: "1" }, { doNotTrack: "yes" }, { globalPrivacyControl: true }]) {

@@ -1,7 +1,7 @@
 //! DocHost — per-chat `SessionDoc` handles: snapshot persistence (debounced), edge room
 //! sync (offline-tolerant), and the HOST-ONLY durable command executor.
 //!
-//! Pragmatic port of zeron's `session-docs.ts` + the `main.ts` executor (spec:
+//! Pragmatic port of kratos's `session-docs.ts` + the `main.ts` executor (spec:
 //! feature-inventory §3.3, ARCHITECTURE §2 "command plane"):
 //! - the doc IS the outbox: commands and user entries commit locally and sync whenever a
 //!   room connection exists; the engine is fully functional with sync disabled;
@@ -28,14 +28,14 @@ use tokio::sync::watch;
 use tokio_util::sync::CancellationToken;
 use tokio_util::task::TaskTracker;
 
-use zeron_doc::{
+use kratos_doc::{
     COMMAND_DEFAULT_TTL_MS, CommandBasedOn, CommandDisposition, DocError, EvaluationContext,
     MessagePart, MessageRole, MessageStatus, QueueDeliveryGate, QueuedMessage, SessionCommandEntry,
     SessionCommandPayload, SessionCommandStatus, SessionDoc, SessionMessageEntry, evaluate_command,
     join_continuation_entries,
 };
-use zeron_proto::{ConversationSourceContext, HarnessId, UserInputAnswer, UserInputQuestion};
-use zeron_sync::DocsStore;
+use kratos_proto::{ConversationSourceContext, HarnessId, UserInputAnswer, UserInputQuestion};
+use kratos_sync::DocsStore;
 
 use crate::sessions::{SessionsEngine, SteerOutcome};
 use crate::workspace_host::WorkspaceHost;
@@ -50,7 +50,7 @@ const SNAPSHOT_DEBOUNCE_MS: u64 = 1_000;
 pub const QUEUE_EDIT_LEASE_MS: i64 = 60_000;
 
 /// Warm-doc LRU: how many unwatched, run-less docs stay fully open. Everything
-/// beyond this (and beyond [`zeron_doc::DOC_LRU_BYTE_BUDGET`]) is evicted
+/// beyond this (and beyond [`kratos_doc::DOC_LRU_BYTE_BUDGET`]) is evicted
 /// oldest-access-first — reopening from the SQLite snapshot measured within
 /// ~11ms of a warm doc, so the cap trades no perceptible open latency.
 const WARM_DOC_CAP: usize = 12;
@@ -112,14 +112,14 @@ const RELAY_MIN_VERSION: (u64, u64, u64) = (0, 2, 12);
 /// Edge connection config. The bearer is a **provider**, never a snapshot:
 /// every room (re)connect and HTTP request re-reads it, so short-lived peer
 /// bearer refreshes take effect without an engine restart. Test/dev bearers
-/// ride the same seam as a [`zeron_rpc::StaticToken`].
+/// ride the same seam as a [`kratos_rpc::StaticToken`].
 #[derive(Clone)]
 pub struct EdgeConfig {
     /// Edge base URL (`http(s)://…`); rewritten to `ws(s)` for the room socket.
     pub url: String,
     /// Fresh-bearer provider (the relay's `TokenSource`), consulted per
     /// connect/request. `None` from the provider = signed out.
-    pub token: Arc<dyn zeron_rpc::TokenSource>,
+    pub token: Arc<dyn kratos_rpc::TokenSource>,
     /// This engine's device id, carried on room dials (`&device=`) so the
     /// edge can attribute sockets in logs. Debugging the 2026-08-04 deaf
     /// socket meant reverse-engineering devices from rotating IPv6 privacy
@@ -137,7 +137,7 @@ impl std::fmt::Debug for EdgeConfig {
 }
 
 impl EdgeConfig {
-    pub fn new(url: impl Into<String>, token: Arc<dyn zeron_rpc::TokenSource>) -> Self {
+    pub fn new(url: impl Into<String>, token: Arc<dyn kratos_rpc::TokenSource>) -> Self {
         Self {
             url: url.into(),
             token,
@@ -153,7 +153,7 @@ impl EdgeConfig {
 
     /// Fixed bearer — dev mode and tests, where tokens never expire.
     pub fn with_static_token(url: impl Into<String>, token: impl Into<String>) -> Self {
-        Self::new(url, Arc::new(zeron_rpc::StaticToken(token.into())))
+        Self::new(url, Arc::new(kratos_rpc::StaticToken(token.into())))
     }
 
     /// The current bearer, refreshed by the provider if stale. `None` = signed out.
@@ -168,7 +168,7 @@ impl EdgeConfig {
     /// A per-dial room URL provider for `path` (e.g. `/session/{chatId}/ws`):
     /// the bearer is re-fetched before every connect, so reconnects after a
     /// token expiry present a fresh `?token=` instead of the boot-time one.
-    pub fn room_url(&self, path: impl Into<String>) -> Arc<dyn zeron_sync::UrlProvider> {
+    pub fn room_url(&self, path: impl Into<String>) -> Arc<dyn kratos_sync::UrlProvider> {
         let ws_base = self.url.replacen("http", "ws", 1);
         Arc::new(EdgeRoomUrl {
             base: format!("{}{}", ws_base.trim_end_matches('/'), path.into()),
@@ -180,18 +180,18 @@ impl EdgeConfig {
 
 struct EdgeRoomUrl {
     base: String,
-    token: Arc<dyn zeron_rpc::TokenSource>,
+    token: Arc<dyn kratos_rpc::TokenSource>,
     device_id: String,
 }
 
-impl zeron_sync::UrlProvider for EdgeRoomUrl {
-    fn url(&self) -> futures::future::BoxFuture<'static, Result<String, zeron_sync::SyncError>> {
+impl kratos_sync::UrlProvider for EdgeRoomUrl {
+    fn url(&self) -> futures::future::BoxFuture<'static, Result<String, kratos_sync::SyncError>> {
         let token = self.token.clone();
         let base = self.base.clone();
         let device = self.device_id.clone();
         Box::pin(async move {
             let token = token.token().await.ok_or_else(|| {
-                zeron_sync::SyncError::Auth("no access token (signed out)".into())
+                kratos_sync::SyncError::Auth("no access token (signed out)".into())
             })?;
             let mut url = format!("{base}?token={token}");
             if !device.is_empty() {
@@ -249,14 +249,14 @@ struct DocHostInner {
     uploads: OnceLock<crate::uploads::Uploads>,
     /// Connectivity watch (`WatchConnectivity`): lazily-started monitor
     /// publishes the edge posture on change (see `watch_connectivity`).
-    connectivity: OnceLock<watch::Sender<zeron_proto::Connectivity>>,
+    connectivity: OnceLock<watch::Sender<kratos_proto::Connectivity>>,
     connectivity_started: AtomicBool,
     /// In-flight queued-attachment transfers, published per landed chunk
     /// (see `watch_transfers`). Entries live exactly as long as bytes are
     /// moving: added when a file's push starts, removed on commit or failure
     /// (a retry re-adds), so consumers can render a real percent while the
     /// relay leg runs and fall back to indeterminate otherwise.
-    transfers: watch::Sender<Vec<zeron_proto::TransferProgress>>,
+    transfers: watch::Sender<Vec<kratos_proto::TransferProgress>>,
     connectivity_grace: Mutex<DegradeGrace>,
     /// Command ids currently BETWEEN mark-processed and their resolution in a
     /// drain. Distinguishes "executing right now" from "consumed by the
@@ -270,7 +270,7 @@ struct DocHostInner {
     delivering: Mutex<HashSet<String>>,
     /// Peer links (engine assembly, edge runtimes only) — the transport that
     /// pushes queued attachment bytes to a remote host.
-    links: OnceLock<Arc<zeron_rpc::LinkCache>>,
+    links: OnceLock<Arc<kratos_rpc::LinkCache>>,
     /// Shared client for sidecar blob PUT/GET (30s timeout, uploads.rs
     /// discipline — diff_sync's untimed client hung on dead links).
     http: reqwest::Client,
@@ -545,7 +545,7 @@ pub struct ChatDocHandle {
     retired: AtomicBool,
     /// chat2 relay client (docs/chat2-sync.md C3) — populated once the
     /// registry names roomGen 2 for this chat and the join resolves.
-    chat2: Mutex<Option<zeron_sync::ChatClient>>,
+    chat2: Mutex<Option<kratos_sync::ChatClient>>,
     /// Local commits made before the relay connects (the dial can take up
     /// to a minute; offline, forever): buffered here by the subscription
     /// below and drained into the client on join (review B3 — a user
@@ -658,7 +658,7 @@ impl ChatDocHandle {
 
     /// Recovery sweep: stamp this device's abandoned `streaming` entries `aborted`, appending
     /// `note` as a visible error part so the transcript says WHY the turn
-    /// ended (zeron folded "Run interrupted by backend restart" the same
+    /// ended (kratos folded "Run interrupted by backend restart" the same
     /// way). Returns the stamped entries' `(id, created_at)` — recovery uses
     /// them for the resume-freshness check.
     pub fn mark_abandoned_streams(&self, note: &str) -> Result<Vec<(String, i64)>, DocError> {
@@ -817,7 +817,7 @@ impl DocHost {
     /// see — so watch session status instead and re-drain every warm chat.
     /// `drain_queue` is a cheap no-op for empty queues and busy agents, which
     /// is why this can afford to be indiscriminate.
-    fn spawn_queue_flush_watcher(&self, mut statuses: watch::Receiver<Vec<zeron_proto::Session>>) {
+    fn spawn_queue_flush_watcher(&self, mut statuses: watch::Receiver<Vec<kratos_proto::Session>>) {
         let host = self.clone();
         self.spawn_worker(async move {
             while statuses.changed().await.is_ok() {
@@ -868,7 +868,7 @@ impl DocHost {
     }
 
     /// Wire the repos engine (engine assembly) — worktree materialization for
-    /// Run commands carrying a [`zeron_proto::WorktreeSpec`].
+    /// Run commands carrying a [`kratos_proto::WorktreeSpec`].
     pub fn set_repos(&self, repos: crate::repos::Repos) {
         let _ = self.inner.repos.set(repos);
     }
@@ -881,7 +881,7 @@ impl DocHost {
 
     /// Wire the peer-link cache (engine assembly, edge runtimes only) — the
     /// transport for queued attachment transfers to a remote host.
-    pub fn set_links(&self, links: Arc<zeron_rpc::LinkCache>) {
+    pub fn set_links(&self, links: Arc<kratos_rpc::LinkCache>) {
         if self.inner.links.set(links).is_err() {
             return;
         }
@@ -945,7 +945,7 @@ impl DocHost {
                     return; // edge-less engine: nothing to migrate onto
                 };
                 let Some(ws) = host.workspace() else { continue };
-                let chats: Vec<zeron_proto::Chat> = ws.watch_chats().borrow().clone();
+                let chats: Vec<kratos_proto::Chat> = ws.watch_chats().borrow().clone();
                 let device = host.inner.config.device_id.clone();
                 let now = now_ms();
                 let candidate = chats.into_iter().find(|c| {
@@ -988,7 +988,7 @@ impl DocHost {
     /// the chat2 adopt path. A handle with a LIVE local writer (a running
     /// turn's doc ref) is left alone — the host never flips mid-run, and a
     /// racing writer must never lose its doc out from under it.
-    fn spawn_cutover_watcher(&self, mut chats: watch::Receiver<Vec<zeron_proto::Chat>>) {
+    fn spawn_cutover_watcher(&self, mut chats: watch::Receiver<Vec<kratos_proto::Chat>>) {
         let host = self.clone();
         self.spawn_worker(async move {
             loop {
@@ -1406,7 +1406,7 @@ impl DocHost {
                 chat.clone(),
             ));
             let url = edge.room_url(format!("/chat2/{chat}/ws"));
-            let mut wake = zeron_sync::wake::subscribe();
+            let mut wake = kratos_sync::wake::subscribe();
             // Sibling-dial successes end a backoff wait immediately, exactly
             // like the joined clients' own reconnect loops (chat_client.rs).
             // Without this, a NEW chat whose first joins hit a network blip
@@ -1414,7 +1414,7 @@ impl DocHost {
             // established room redialed instantly on recovery — fresh sends
             // to new sessions stalled while other chats hummed (2026-08-19
             // user report, reproduced on two networks).
-            let mut online = zeron_sync::wake::subscribe_online();
+            let mut online = kratos_sync::wake::subscribe_online();
             let mut backoff = crate::workspace_host::JOIN_RETRY_BASE;
             loop {
                 if weak.upgrade().is_none() {
@@ -1433,7 +1433,7 @@ impl DocHost {
                 ));
                 let dial = tokio::time::timeout(
                     std::time::Duration::from_secs(60),
-                    zeron_sync::ChatClient::connect_via_transport(
+                    kratos_sync::ChatClient::connect_via_transport(
                         url.clone(),
                         sink.clone(),
                         fetcher.clone(),
@@ -1541,7 +1541,7 @@ impl DocHost {
                             let weak = weak.clone();
                             let chat = chat.clone();
                             host.clone().spawn_worker(async move {
-                                use zeron_sync::chat_client::ChatEvent;
+                                use kratos_sync::chat_client::ChatEvent;
                                 loop {
                                     match events.recv().await {
                                         Ok(ChatEvent::ServerReset) => {
@@ -1711,7 +1711,7 @@ impl DocHost {
     ) -> Result<(), String> {
         use base64::Engine as _;
         let vv_at_rebuild = doc.doc().oplog_vv().encode();
-        let rebuilt = zeron_doc::rebuild::rebuild_thin_doc(&doc).map_err(|e| e.to_string())?;
+        let rebuilt = kratos_doc::rebuild::rebuild_thin_doc(&doc).map_err(|e| e.to_string())?;
         // The seed's own doc ref must be gone before the pinned re-check
         // below: `pinned` reads `Arc::strong_count(&handle.doc) > 1`, and
         // holding this clone made that true unconditionally — every seed
@@ -1835,7 +1835,7 @@ impl DocHost {
             // Let boot settle (registry load, room joins) before sweeping.
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             let Some(ws) = host.workspace() else { return };
-            let chats: Vec<zeron_proto::Chat> = ws.watch_chats().borrow().clone();
+            let chats: Vec<kratos_proto::Chat> = ws.watch_chats().borrow().clone();
             for chat in chats {
                 if chat.device_id != host.inner.config.device_id {
                     continue; // only the host owns its chats' history
@@ -1882,7 +1882,7 @@ impl DocHost {
         // Thin before appending (docs/chat2-sync.md A2): full outputs are
         // parked, exactly like a seed — they survive in the rollback copy
         // saved below and the run journal.
-        let rebuilt = zeron_doc::rebuild::rebuild_thin_doc(&fat).map_err(|e| e.to_string())?;
+        let rebuilt = kratos_doc::rebuild::rebuild_thin_doc(&fat).map_err(|e| e.to_string())?;
         let entries = rebuilt.doc.read_entries().map_err(|e| e.to_string())?;
         if entries.is_empty() {
             return Ok(());
@@ -1931,7 +1931,7 @@ impl DocHost {
         let chat_id = handle.chat_id.clone();
         // Tail publish: cheap, every quiesce tick.
         if let Ok(tail) =
-            zeron_doc::materialize_tail(&handle.doc, now_ms(), zeron_doc::TAIL_MESSAGE_COUNT)
+            kratos_doc::materialize_tail(&handle.doc, now_ms(), kratos_doc::TAIL_MESSAGE_COUNT)
             && let Ok(body) = serde_json::to_vec(&tail)
         {
             let http = self.inner.http.clone();
@@ -2103,7 +2103,7 @@ impl DocHost {
                         .sum::<usize>(),
                 )
             };
-            if count <= WARM_DOC_CAP && estimate <= zeron_doc::DOC_LRU_BYTE_BUDGET {
+            if count <= WARM_DOC_CAP && estimate <= kratos_doc::DOC_LRU_BYTE_BUDGET {
                 return;
             }
             let evicted = {
@@ -2213,14 +2213,14 @@ impl DocHost {
             if let Ok(res) = res
                 && res.status().is_success()
             {
-                zeron_sync::wake::notify_online();
+                kratos_sync::wake::notify_online();
             }
         });
     }
 
     /// The in-flight queued-attachment transfer set: current entries first,
     /// then a fresh snapshot per landed chunk (see `push_attachments`).
-    pub fn watch_transfers(&self) -> watch::Receiver<Vec<zeron_proto::TransferProgress>> {
+    pub fn watch_transfers(&self) -> watch::Receiver<Vec<kratos_proto::TransferProgress>> {
         self.inner.transfers.subscribe()
     }
 
@@ -2232,7 +2232,7 @@ impl DocHost {
                     t.done = done;
                     t.total = total;
                 }
-                None => list.push(zeron_proto::TransferProgress {
+                None => list.push(kratos_proto::TransferProgress {
                     upload_id: upload_id.to_string(),
                     file_name: file_name.to_string(),
                     done,
@@ -2255,7 +2255,7 @@ impl DocHost {
     /// (atomics + small locks), published only when the value changes. The
     /// retry countdown renders client-side from `retry_at_ms`, so quiet
     /// periods emit nothing at all.
-    pub fn watch_connectivity(&self) -> watch::Receiver<zeron_proto::Connectivity> {
+    pub fn watch_connectivity(&self) -> watch::Receiver<kratos_proto::Connectivity> {
         let tx = self
             .inner
             .connectivity
@@ -2296,8 +2296,8 @@ impl DocHost {
     /// those flashed amber warnings and "Queued" badges at every chat
     /// switch. Raw degradation must persist [`DEGRADE_GRACE`] before it is
     /// reported; recovery reports instantly.
-    fn compute_connectivity(&self) -> zeron_proto::Connectivity {
-        use zeron_proto::{ChatConnectivity, Connectivity, ConnectivityState};
+    fn compute_connectivity(&self) -> kratos_proto::Connectivity {
+        use kratos_proto::{ChatConnectivity, Connectivity, ConnectivityState};
         let workspace = self.workspace();
         let edge_expected = self.inner.config.edge.is_some()
             || workspace.as_ref().is_some_and(|w| w.edge_expected());
@@ -2326,7 +2326,7 @@ impl DocHost {
             .and_then(|w| w.sync_status())
             .is_some_and(|s| s.connected);
         let path_offline =
-            grace.degraded(GraceKey::OsPath, zeron_sync::wake::path_is_offline(), now);
+            grace.degraded(GraceKey::OsPath, kratos_sync::wake::path_is_offline(), now);
         let registry_down = grace.degraded(GraceKey::Registry, !registry_connected, now);
         let (state, retry_at_ms, last_failure) = if path_offline {
             (
@@ -2352,12 +2352,12 @@ impl DocHost {
         }
     }
 
-    /// Per-open-chat room introspection for SyncStatus / `zeron sync`.
+    /// Per-open-chat room introspection for SyncStatus / `kratos sync`.
     /// `None` room = still dialing (join retry loop) or edge-less.
-    pub fn sync_statuses(&self) -> Vec<(String, Option<zeron_sync::ChatStatsSnapshot>)> {
+    pub fn sync_statuses(&self) -> Vec<(String, Option<kratos_sync::ChatStatsSnapshot>)> {
         let handles: Vec<Arc<ChatDocHandle>> =
             lock(&self.inner.handles).values().cloned().collect();
-        let mut rows: Vec<(String, Option<zeron_sync::ChatStatsSnapshot>)> = handles
+        let mut rows: Vec<(String, Option<kratos_sync::ChatStatsSnapshot>)> = handles
             .iter()
             .map(|h| {
                 (
@@ -3241,7 +3241,7 @@ impl DocHost {
     /// 2. give the normal path (chat2 rows → edge → host's room) a short
     ///    grace to ack;
     /// 3. rows still not at the edge but the peer link alive → relay-forward
-    ///    the entry itself ([`zeron_rpc::methods::RELAY_COMMAND`]). The
+    ///    the entry itself ([`kratos_rpc::methods::RELAY_COMMAND`]). The
     ///    host's processed ledger claims the client-minted id, so the doc
     ///    row arriving later dedupes to a no-op — exactly-once by
     ///    construction (the 2026-08-18 03:45 incident shape: nudges flowed,
@@ -3306,8 +3306,8 @@ impl DocHost {
             if !transfers.is_empty() && !host.deliver_attachments(&chat, &transfers).await {
                 return; // gave up; the drain's wait cap surfaces the failure
             }
-            let mut wake = zeron_sync::wake::subscribe();
-            let mut online = zeron_sync::wake::subscribe_online();
+            let mut wake = kratos_sync::wake::subscribe();
+            let mut online = kratos_sync::wake::subscribe_online();
             let give_up = tokio::time::Instant::now() + RELAY_GIVE_UP;
             let grace_end = tokio::time::Instant::now() + ROWS_GRACE;
             while tokio::time::Instant::now() < grace_end {
@@ -3358,8 +3358,8 @@ impl DocHost {
         chat: &str,
         transfers: &[crate::uploads::AttachmentTransfer],
     ) -> bool {
-        let mut wake = zeron_sync::wake::subscribe();
-        let mut online = zeron_sync::wake::subscribe_online();
+        let mut wake = kratos_sync::wake::subscribe();
+        let mut online = kratos_sync::wake::subscribe_online();
         let mut backoff = TRANSFER_BACKOFF_BASE;
         let deadline = tokio::time::Instant::now() + ATTACHMENT_WAIT_MAX;
         loop {
@@ -3536,7 +3536,7 @@ impl DocHost {
             .into_iter()
             .flatten()
             .find(|d| d.id == target)
-            .and_then(|d| d.version.as_deref().and_then(zeron_proto::version_triple))
+            .and_then(|d| d.version.as_deref().and_then(kratos_proto::version_triple))
             .is_some_and(|v| v >= RELAY_MIN_VERSION);
         if !supported {
             return Err("host does not support relay delivery (version gate)".into());
@@ -3551,13 +3551,13 @@ impl DocHost {
             .await
             .map_err(|e| format!("peer link: {e}"))?;
         let params = serde_json::json!({ "chatId": chat_id, "entry": entry });
-        let call = client.call(zeron_rpc::methods::RELAY_COMMAND, params);
+        let call = client.call(kratos_rpc::methods::RELAY_COMMAND, params);
         match tokio::time::timeout(RELAY_CALL_TIMEOUT, call).await {
             Err(_) => {
                 links.invalidate(target);
                 Err("relay call timed out; peer link suspect".into())
             }
-            Ok(Err(zeron_rpc::RpcError::Failed(err))) => Err(format!("host refused: {err}")),
+            Ok(Err(kratos_rpc::RpcError::Failed(err))) => Err(format!("host refused: {err}")),
             Ok(Err(err)) => {
                 links.invalidate(target);
                 Err(format!("relay call failed: {err}"))
@@ -3707,7 +3707,7 @@ impl DocHost {
         Ok(())
     }
 
-    /// Host side of [`zeron_rpc::methods::RELAY_COMMAND`]: evaluate the
+    /// Host side of [`kratos_rpc::methods::RELAY_COMMAND`]: evaluate the
     /// forwarded entry against OUR doc (dedupe/TTL/supersede rules apply
     /// unchanged), claim its client-minted id in the processed ledger, then
     /// execute. The claim is what makes the doc row arriving later — over
@@ -3897,7 +3897,7 @@ impl DocHost {
     /// Fire-and-forget: the doc already carries the summary, so a lost upload
     /// degrades to "full output unavailable" — it must never block or fail
     /// the run. Offline/edge-less engines skip silently.
-    pub fn upload_tool_sidecar(&self, chat_id: &str, payload: zeron_doc::SidecarPayload) {
+    pub fn upload_tool_sidecar(&self, chat_id: &str, payload: kratos_doc::SidecarPayload) {
         let Some(edge) = self.inner.config.edge.clone() else {
             return;
         };
@@ -4039,7 +4039,7 @@ impl DocHost {
     pub(crate) fn harness_for_request(
         &self,
         chat_id: &str,
-        request: &zeron_proto::RunRequest,
+        request: &kratos_proto::RunRequest,
     ) -> HarnessId {
         request.harness.unwrap_or_else(|| self.harness_for(chat_id))
     }
@@ -4247,7 +4247,7 @@ impl DocHost {
     /// paths — in the attachments list AND the prompt text — so the harness
     /// (and the persisted user entry) see ordinary local files, exactly like
     /// the legacy pre-upload flow produced.
-    fn resolve_request_attachments(&self, request: &mut zeron_proto::RunRequest) {
+    fn resolve_request_attachments(&self, request: &mut kratos_proto::RunRequest) {
         let Some(uploads) = self.inner.uploads.get() else {
             return;
         };
@@ -4333,7 +4333,7 @@ impl DocHost {
                     ws.claim_chat(chat_id, Some(&request.cwd))?;
                     // A pre-existing row (the client's createChat raced ahead)
                     // still carries the repo folder — repoint it at the fresh
-                    // worktree, and stamp the actual `zeron/<name>` branch so
+                    // worktree, and stamp the actual `kratos/<name>` branch so
                     // the footer and the title-rename flow see it.
                     if let Some(wt) = &fresh_worktree {
                         if let Err(err) = ws.set_chat_cwd(chat_id, &wt.path) {
@@ -4353,7 +4353,7 @@ impl DocHost {
                 if let Some(ws) = self.workspace()
                     && ws.chat_config(chat_id).is_none()
                 {
-                    let config = zeron_proto::ChatConfig {
+                    let config = kratos_proto::ChatConfig {
                         harness,
                         model: request.model.clone(),
                         reasoning: request.reasoning,
@@ -4481,7 +4481,7 @@ impl DocHost {
     pub(crate) fn store_public_transcript(
         &self,
         doc_id: &str,
-        snapshot: &zeron_proto::ChildTranscript,
+        snapshot: &kratos_proto::ChildTranscript,
     ) -> Result<(), EngineError> {
         let bytes = serde_json::to_vec(snapshot).map_err(|e| EngineError::Other(e.to_string()))?;
         self.inner
@@ -4493,7 +4493,7 @@ impl DocHost {
     pub(crate) fn public_transcript(
         &self,
         doc_id: &str,
-    ) -> Result<Option<zeron_proto::ChildTranscript>, EngineError> {
+    ) -> Result<Option<kratos_proto::ChildTranscript>, EngineError> {
         self.inner
             .store
             .load_snapshot(&format!("{doc_id}.public"))
@@ -4507,7 +4507,7 @@ impl DocHost {
     /// Put a typed prompt in front of a live agent: steer it in, or — with no
     /// live steerable run — deliver the durable command as the next turn.
     /// After an engine restart `last_request` is empty too, so rebuild the run
-    /// config from the chat's workspace row (zeron derived dispatch config from
+    /// config from the chat's workspace row (kratos derived dispatch config from
     /// the chat row the same way — sessions.ts:601-620); dispatch's engine-owned
     /// resume then reattaches the prior harness conversation.
     ///
@@ -4641,7 +4641,7 @@ impl DocHost {
         sessions: &SessionsEngine,
         chat_id: &str,
         harness: HarnessId,
-        request: zeron_proto::RunRequest,
+        request: kratos_proto::RunRequest,
         message_id: Option<String>,
     ) -> Result<String, EngineError> {
         if let Some(workspace) = self.workspace()
@@ -4655,7 +4655,7 @@ impl DocHost {
             .await
     }
 
-    /// Create (or reuse) the isolated worktree a Run's [`zeron_proto::WorktreeSpec`]
+    /// Create (or reuse) the isolated worktree a Run's [`kratos_proto::WorktreeSpec`]
     /// asks for, returning the resolved cwd plus the fresh worktree when one was
     /// actually created. Reuse guard: a chat whose row already points inside a
     /// linked worktree of the same repo keeps it — a duplicate Run (client retry
@@ -4663,8 +4663,8 @@ impl DocHost {
     async fn materialize_worktree(
         &self,
         chat_id: &str,
-        spec: &zeron_proto::WorktreeSpec,
-    ) -> Result<(String, Option<zeron_proto::Worktree>), EngineError> {
+        spec: &kratos_proto::WorktreeSpec,
+    ) -> Result<(String, Option<kratos_proto::Worktree>), EngineError> {
         if let Some(ws) = self.workspace()
             && let Ok(Some(chat)) = ws.chat(chat_id)
             && let Some(cwd) = chat.cwd
@@ -4701,7 +4701,7 @@ impl DocHost {
         &self,
         chat_id: &str,
         prompt: &str,
-    ) -> Option<zeron_proto::RunRequest> {
+    ) -> Option<kratos_proto::RunRequest> {
         let workspace = self.workspace()?;
         let chat = match workspace.chat(chat_id) {
             Ok(chat) => chat?,
@@ -4711,7 +4711,7 @@ impl DocHost {
             }
         };
         let config = chat.config;
-        Some(zeron_proto::RunRequest {
+        Some(kratos_proto::RunRequest {
             prompt: prompt.to_string(),
             harness: config.as_ref().map(|c| c.harness),
             model: config.as_ref().and_then(|c| c.model.clone()),
@@ -4724,7 +4724,7 @@ impl DocHost {
             sandbox: config
                 .as_ref()
                 .map(|c| c.sandbox)
-                .unwrap_or(zeron_proto::SandboxLevel::WorkspaceWrite),
+                .unwrap_or(kratos_proto::SandboxLevel::WorkspaceWrite),
             auto_approve: false,
             attachments: Vec::new(),
             resume: None,
@@ -4828,12 +4828,12 @@ mod transfer_progress_tests {
 
     fn host() -> (tempfile::TempDir, DocHost) {
         let dir = tempfile::tempdir().expect("tempdir");
-        let store = Arc::new(zeron_sync::DocsStore::open(dir.path()).expect("store opens"));
+        let store = Arc::new(kratos_sync::DocsStore::open(dir.path()).expect("store opens"));
         let host = DocHost::new(
             store,
             DocHostConfig {
                 device_id: "dev-test".into(),
-                default_harness: zeron_proto::HarnessId::Mock,
+                default_harness: kratos_proto::HarnessId::Mock,
                 edge: None,
             },
         );
@@ -4912,19 +4912,19 @@ mod source_context_tests {
         let repo = dir.path().join("repo");
         std::fs::create_dir(&repo).unwrap();
         git(&repo, &["init", "-b", "feature/captured"]);
-        git(&repo, &["config", "user.name", "Zeron Test"]);
-        git(&repo, &["config", "user.email", "zeron@example.com"]);
+        git(&repo, &["config", "user.name", "Kratos Test"]);
+        git(&repo, &["config", "user.email", "kratos@example.com"]);
         std::fs::write(repo.join("README.md"), "capture\n").unwrap();
         git(&repo, &["add", "README.md"]);
         git(&repo, &["commit", "-m", "capture"]);
 
         let store =
-            Arc::new(zeron_sync::DocsStore::open(dir.path().join("docs")).expect("store opens"));
+            Arc::new(kratos_sync::DocsStore::open(dir.path().join("docs")).expect("store opens"));
         let host = DocHost::new(
             store,
             DocHostConfig {
                 device_id: "device-a".into(),
-                default_harness: zeron_proto::HarnessId::Mock,
+                default_harness: kratos_proto::HarnessId::Mock,
                 edge: None,
             },
         );

@@ -1,8 +1,8 @@
 use futures::StreamExt;
 use std::{sync::Arc, time::Duration};
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_proto::{HarnessId, PreviewService};
-use zeron_rpc::{RpcReply, RpcService, methods};
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_proto::{HarnessId, PreviewService};
+use kratos_rpc::{RpcReply, RpcService, methods};
 
 fn service(device: &str, cwd: &std::path::Path, id: &str) -> PreviewService {
     PreviewService {
@@ -18,7 +18,7 @@ fn service(device: &str, cwd: &std::path::Path, id: &str) -> PreviewService {
         pid: 123,
         cwd: cwd.to_string_lossy().into_owned(),
         started_at: 1,
-        zeron_owned: true,
+        kratos_owned: true,
     }
 }
 #[tokio::test]

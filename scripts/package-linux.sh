@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Linux packaging: build the release binary and produce
-#   target/package/zeron-<version>-linux-<arch>.tar.gz
+#   target/package/kratos-<version>-linux-<arch>.tar.gz
 # containing the binary, the .desktop entry, and the icon, plus an install.sh
 # that drops them into ~/.local (XDG) paths.
 #
@@ -15,16 +15,16 @@ PROFILE="${PROFILE:-release}"
 ARCH="$(uname -m)"
 VERSION="$(grep -m1 '^version' "$ROOT/Cargo.toml" | sed 's/.*"\(.*\)".*/\1/')"
 OUT_DIR="$ROOT/target/package"
-STAGE="$OUT_DIR/zeron-$VERSION-linux-$ARCH"
+STAGE="$OUT_DIR/kratos-$VERSION-linux-$ARCH"
 TARBALL="$STAGE.tar.gz"
 
 cd "$ROOT"
 if [[ "$PROFILE" == "release" ]]; then
-  cargo build --release -p zeron
-  BIN="$ROOT/target/release/zeron"
+  cargo build --release -p kratos
+  BIN="$ROOT/target/release/kratos"
 else
-  cargo build -p zeron
-  BIN="$ROOT/target/debug/zeron"
+  cargo build -p kratos
+  BIN="$ROOT/target/debug/kratos"
 fi
 
 GO="${GO:-go}"
@@ -34,14 +34,14 @@ TAILCAT_BIN="$ROOT/target/tailcat/kratos-tailcat"
 
 rm -rf "$STAGE" "$TARBALL"
 mkdir -p "$STAGE"
-install -m 755 "$BIN" "$STAGE/zeron"
+install -m 755 "$BIN" "$STAGE/kratos"
 
 install -m 644 "$ROOT/LICENSE" "$STAGE/LICENSE"
 install -m 644 "$ROOT/THIRD_PARTY_NOTICES.md" "$STAGE/THIRD_PARTY_NOTICES.md"
 
 install -m 755 "$TAILCAT_BIN" "$STAGE/kratos-tailcat"
-install -m 644 "$ROOT/dist/zeron.desktop" "$STAGE/zeron.desktop"
-install -m 644 "$ROOT/dist/zeron.png" "$STAGE/zeron.png"
+install -m 644 "$ROOT/dist/kratos.desktop" "$STAGE/kratos.desktop"
+install -m 644 "$ROOT/dist/kratos.png" "$STAGE/kratos.png"
 mkdir -p "$STAGE/licenses/fonts"
 cp "$ROOT/crates/ui/assets/fonts/licenses/"* "$STAGE/licenses/fonts/"
 
@@ -50,19 +50,19 @@ cp -R "$ROOT/connectivity/tailcat/licenses/bundle/." "$STAGE/licenses/tailcat/"
 
 cat >"$STAGE/install.sh" <<'INSTALL'
 #!/usr/bin/env bash
-# Install Zeron into ~/.local (no root needed).
+# Install Kratos into ~/.local (no root needed).
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-install -Dm755 "$HERE/zeron" "$HOME/.local/bin/zeron"
+install -Dm755 "$HERE/kratos" "$HOME/.local/bin/kratos"
 
 install -Dm755 "$HERE/kratos-tailcat" "$HOME/.local/bin/kratos-tailcat"
-install -Dm644 "$HERE/zeron.desktop" "$HOME/.local/share/applications/zeron.desktop"
-install -Dm644 "$HERE/zeron.png" "$HOME/.local/share/icons/hicolor/1024x1024/apps/zeron.png"
+install -Dm644 "$HERE/kratos.desktop" "$HOME/.local/share/applications/kratos.desktop"
+install -Dm644 "$HERE/kratos.png" "$HOME/.local/share/icons/hicolor/1024x1024/apps/kratos.png"
 
-install -Dm644 "$HERE/LICENSE" "$HOME/.local/share/doc/zeron/LICENSE"
-install -Dm644 "$HERE/THIRD_PARTY_NOTICES.md" "$HOME/.local/share/doc/zeron/THIRD_PARTY_NOTICES.md"
-install -d "$HOME/.local/share/doc/zeron/licenses"
-cp -R "$HERE/licenses/." "$HOME/.local/share/doc/zeron/licenses/"
+install -Dm644 "$HERE/LICENSE" "$HOME/.local/share/doc/kratos/LICENSE"
+install -Dm644 "$HERE/THIRD_PARTY_NOTICES.md" "$HOME/.local/share/doc/kratos/THIRD_PARTY_NOTICES.md"
+install -d "$HOME/.local/share/doc/kratos/licenses"
+cp -R "$HERE/licenses/." "$HOME/.local/share/doc/kratos/licenses/"
 command -v update-desktop-database >/dev/null 2>&1 \
   && update-desktop-database "$HOME/.local/share/applications" || true
 echo "Installed. Make sure ~/.local/bin is on your PATH."

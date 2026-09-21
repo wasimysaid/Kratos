@@ -1,5 +1,5 @@
-//! zeron-update — release checking and self-update, shared by the engine (the
-//! background checker + `ApplyUpdate`), the CLI (`zeron update`), and the UI
+//! kratos-update — release checking and self-update, shared by the engine (the
+//! background checker + `ApplyUpdate`), the CLI (`kratos update`), and the UI
 //! (the sidebar update strip + macOS bundle swap).
 //!
 //! Release layout (see `.github/workflows/release.yml` and `scripts/install.sh`):
@@ -9,7 +9,7 @@
 //! edge service.
 //!
 //! Install kinds and their update paths:
-//! - **Managed** (`~/.zeron/app/<ver>` + `current` symlink — the curl|sh
+//! - **Managed** (`~/.kratos/app/<ver>` + `current` symlink — the curl|sh
 //!   installer): download the headless tarball into a new versioned dir, flip
 //!   the symlink, restart the service. Same flow the installer script performs,
 //!   natively.
@@ -107,16 +107,16 @@ fn require_mac_app_update_platform() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// `zeron-<ver>-<os>-<arch>.tar.gz` — the headless/CLI tarball (Linux CI builds).
+/// `kratos-<ver>-<os>-<arch>.tar.gz` — the headless/CLI tarball (Linux CI builds).
 pub fn headless_artifact(version: &str) -> String {
     let (os, arch) = platform_key();
-    format!("zeron-{version}-{os}-{arch}.tar.gz")
+    format!("kratos-{version}-{os}-{arch}.tar.gz")
 }
 
-/// `zeron-<ver>-macos-<arch>-app.tar.gz` — the macOS app update payload.
+/// `kratos-<ver>-macos-<arch>-app.tar.gz` — the macOS app update payload.
 pub fn mac_app_artifact(version: &str) -> String {
     let (_, arch) = platform_key();
-    format!("zeron-{version}-macos-{arch}-app.tar.gz")
+    format!("kratos-{version}-macos-{arch}-app.tar.gz")
 }
 
 /// Strictly-newer dotted-numeric compare (`0.1.10` > `0.1.9` > `0.1`).
@@ -142,8 +142,8 @@ pub fn version_newer(latest: &str, current: &str) -> bool {
 ///
 /// The `edge_url` argument remains temporarily for caller API compatibility but
 /// is deliberately not used to derive the release feed. Set
-/// `ZERON_RELEASES_URL` for an explicit mirror/test feed; Windows portable
-/// packages can also carry an HTTPS feed in `zeron-update.json`.
+/// `KRATOS_RELEASES_URL` for an explicit mirror/test feed; Windows portable
+/// packages can also carry an HTTPS feed in `kratos-update.json`.
 pub async fn fetch_latest(edge_url: &str) -> anyhow::Result<Manifest> {
     let base = release_base(edge_url)?;
     fetch_latest_from_base(&base).await
@@ -178,7 +178,7 @@ fn valid_version(version: &str) -> bool {
 
 fn http_client() -> anyhow::Result<reqwest::Client> {
     reqwest::Client::builder()
-        .user_agent(concat!("zeron/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("kratos/", env!("CARGO_PKG_VERSION")))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             if attempt.previous().len() >= 10 {
                 return attempt.error("too many update redirects");
@@ -211,7 +211,7 @@ fn validate_release_override(value: &str) -> anyhow::Result<String> {
 }
 
 fn release_base(edge_url: &str) -> anyhow::Result<String> {
-    if let Ok(url) = std::env::var("ZERON_RELEASES_URL")
+    if let Ok(url) = std::env::var("KRATOS_RELEASES_URL")
         && !url.trim().is_empty()
     {
         return validate_release_override(&url);
@@ -230,8 +230,8 @@ fn release_base(edge_url: &str) -> anyhow::Result<String> {
 /// How this binary was installed — decides the update path.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InstallKind {
-    /// `~/.zeron/app/<ver>/zeron` behind the `current` symlink
-    /// (curl|sh installer / a previous `zeron update`).
+    /// `~/.kratos/app/<ver>/kratos` behind the `current` symlink
+    /// (curl|sh installer / a previous `kratos update`).
     Managed { app_root: PathBuf },
     /// Running out of a macOS `.app` bundle.
     MacApp { bundle: PathBuf },
@@ -302,14 +302,14 @@ fn detect_install_from_for_os(exe: &Path, home: Option<&Path>, os: &str) -> Inst
             directory: exe.parent().unwrap().to_owned(),
         };
     }
-    // Never interpret a coincidental Windows `%HOME%\.zeron\app` layout as
+    // Never interpret a coincidental Windows `%HOME%\.kratos\app` layout as
     // the Unix symlink-managed installation.
     if !managed_updates_supported(os) {
         return InstallKind::Unmanaged;
     }
     if let Some(home) = home {
         // `current_exe` resolves the `current` symlink to the versioned dir.
-        let app_root = home.join(".zeron").join("app");
+        let app_root = home.join(".kratos").join("app");
         if exe.starts_with(&app_root) {
             return InstallKind::Managed { app_root };
         }
@@ -425,7 +425,7 @@ pub async fn stage_headless(
     require_managed_update_platform()?;
     let version = &manifest.version;
     let dest = app_root.join(version);
-    if dest.join("zeron").exists() {
+    if dest.join("kratos").exists() {
         return Ok(dest);
     }
     let file = headless_artifact(version);
@@ -449,13 +449,13 @@ pub async fn stage_headless(
                 "--strip-components=1",
             ],
         )?;
-        if !unpacked.join("zeron").is_file() {
-            bail!("tarball {file} did not contain a zeron binary");
+        if !unpacked.join("kratos").is_file() {
+            bail!("tarball {file} did not contain a kratos binary");
         }
         match std::fs::rename(&unpacked, &dest) {
             Ok(()) => {}
             // Lost a race with another stager — the staged copy is equivalent.
-            Err(_) if dest.join("zeron").exists() => {}
+            Err(_) if dest.join("kratos").exists() => {}
             Err(err) => {
                 return Err(err).with_context(|| format!("moving {} into place", dest.display()));
             }
@@ -473,7 +473,7 @@ pub fn apply_headless(app_root: &Path, version: &str) -> anyhow::Result<()> {
     #[cfg(unix)]
     {
         let target = app_root.join(version);
-        if !target.join("zeron").exists() {
+        if !target.join("kratos").exists() {
             bail!("{} is not a staged install", target.display());
         }
         let tmp = app_root.join(format!(".current-{}", std::process::id()));
@@ -490,7 +490,7 @@ pub fn apply_headless(app_root: &Path, version: &str) -> anyhow::Result<()> {
     }
 }
 
-/// Restart the installed engine service (the same units `zeron daemon` and the
+/// Restart the installed engine service (the same units `kratos daemon` and the
 /// curl|sh installer manage). Called after a symlink swap so the running daemon
 /// picks up the new binary.
 pub fn restart_service() -> anyhow::Result<()> {
@@ -500,10 +500,10 @@ pub fn restart_service() -> anyhow::Result<()> {
         let uid = String::from_utf8_lossy(&output.stdout).trim().to_string();
         run(
             "launchctl",
-            &["kickstart", "-k", &format!("gui/{uid}/sh.zeron.app")],
+            &["kickstart", "-k", &format!("gui/{uid}/sh.kratos.app")],
         )
     } else {
-        run("systemctl", &["--user", "restart", "zeron.service"])
+        run("systemctl", &["--user", "restart", "kratos.service"])
     }
 }
 
@@ -511,7 +511,7 @@ pub fn restart_service() -> anyhow::Result<()> {
 // macOS app-bundle installs — the desktop path
 // ---------------------------------------------------------------------------
 
-/// Download + unpack the app tarball into `{data_dir}/updates/<ver>/Zeron.app`
+/// Download + unpack the app tarball into `{data_dir}/updates/<ver>/Kratos.app`
 /// (idempotent). Returns the staged bundle path.
 pub async fn stage_mac_app(
     edge_url: &str,
@@ -522,8 +522,8 @@ pub async fn stage_mac_app(
     require_mac_app_update_platform()?;
     let version = &manifest.version;
     let dir = data_dir.join("updates").join(version);
-    let staged = dir.join("Zeron.app");
-    if staged.join("Contents/MacOS/zeron").exists() {
+    let staged = dir.join("Kratos.app");
+    if staged.join("Contents/MacOS/kratos").exists() {
         return Ok(staged);
     }
     let _ = std::fs::remove_dir_all(&dir);
@@ -541,8 +541,8 @@ pub async fn stage_mac_app(
         ],
     )?;
     std::fs::remove_file(&tarball).ok();
-    if !staged.join("Contents/MacOS/zeron").exists() {
-        bail!("app tarball {file} did not contain Zeron.app");
+    if !staged.join("Contents/MacOS/kratos").exists() {
+        bail!("app tarball {file} did not contain Kratos.app");
     }
     Ok(staged)
 }
@@ -637,9 +637,9 @@ impl UpdateStatus {
     }
 }
 
-/// `ZERON_AUTO_UPDATE=1|true|yes` — headless daemons apply updates themselves.
+/// `KRATOS_AUTO_UPDATE=1|true|yes` — headless daemons apply updates themselves.
 fn auto_update_enabled() -> bool {
-    std::env::var("ZERON_AUTO_UPDATE")
+    std::env::var("KRATOS_AUTO_UPDATE")
         .map(|v| matches!(v.trim().to_ascii_lowercase().as_str(), "1" | "true" | "yes"))
         .unwrap_or(false)
 }
@@ -650,7 +650,7 @@ pub type QuiescentCheck = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// Background release checker: polls the GitHub Release feed on a 6h cadence and
 /// publishes [`UpdateStatus`] over a watch channel (the `UpdateStatus` RPC
-/// stream). Managed installs with `ZERON_AUTO_UPDATE` set stage + apply + service
+/// stream). Managed installs with `KRATOS_AUTO_UPDATE` set stage + apply + service
 /// restart on their own — but only in a quiet window: while `quiescent` reports
 /// activity, the apply defers and re-probes every [`IDLE_RECHECK`].
 #[derive(Clone)]
@@ -885,32 +885,32 @@ mod tests {
     fn install_kind_detection() {
         assert_eq!(
             detect_install_from_for_os(
-                Path::new("/home/u/.zeron/app/0.1.1/zeron"),
+                Path::new("/home/u/.kratos/app/0.1.1/kratos"),
                 Some(Path::new("/home/u")),
                 "linux",
             ),
             InstallKind::Managed {
-                app_root: PathBuf::from("/home/u/.zeron/app")
+                app_root: PathBuf::from("/home/u/.kratos/app")
             }
         );
         assert_eq!(
             detect_install_from_for_os(
-                Path::new("/Applications/Zeron.app/Contents/MacOS/zeron"),
+                Path::new("/Applications/Kratos.app/Contents/MacOS/kratos"),
                 Some(Path::new("/Users/u")),
                 "macos",
             ),
             InstallKind::MacApp {
-                bundle: PathBuf::from("/Applications/Zeron.app")
+                bundle: PathBuf::from("/Applications/Kratos.app")
             }
         );
         // A path merely containing `.app` without the bundle layout is not a bundle.
         assert_eq!(
-            detect_install_from_for_os(Path::new("/tmp/foo.app/zeron"), None, "macos"),
+            detect_install_from_for_os(Path::new("/tmp/foo.app/kratos"), None, "macos"),
             InstallKind::Unmanaged
         );
         assert_eq!(
             detect_install_from_for_os(
-                Path::new("/src/target/release/zeron"),
+                Path::new("/src/target/release/kratos"),
                 Some(Path::new("/home/u")),
                 "linux",
             ),
@@ -921,17 +921,17 @@ mod tests {
     #[test]
     fn artifact_names_match_packaging() {
         let (os, arch) = platform_key();
-        assert!(headless_artifact("0.2.0").starts_with("zeron-0.2.0-"));
+        assert!(headless_artifact("0.2.0").starts_with("kratos-0.2.0-"));
         assert_eq!(
             headless_artifact("0.2.0"),
-            format!("zeron-0.2.0-{os}-{arch}.tar.gz")
+            format!("kratos-0.2.0-{os}-{arch}.tar.gz")
         );
         assert!(mac_app_artifact("0.2.0").ends_with("-app.tar.gz"));
     }
 
     #[test]
     fn default_feed_is_github_and_does_not_derive_from_edge() {
-        if std::env::var_os("ZERON_RELEASES_URL").is_none() {
+        if std::env::var_os("KRATOS_RELEASES_URL").is_none() {
             assert_eq!(
                 release_base("https://legacy.example.invalid").unwrap(),
                 DEFAULT_RELEASES_URL
@@ -942,7 +942,7 @@ mod tests {
     #[tokio::test]
     async fn downloads_require_a_well_formed_checksum_before_network_io() {
         let tmp = tempfile::tempdir().unwrap();
-        let file = "zeron-1.2.3-linux-x86_64.tar.gz";
+        let file = "kratos-1.2.3-linux-x86_64.tar.gz";
         let mut manifest = Manifest {
             version: "1.2.3".into(),
             files: BTreeMap::new(),
@@ -985,7 +985,7 @@ mod tests {
     fn windows_install_is_always_unmanaged() {
         assert_eq!(
             detect_install_from(
-                Path::new(r"C:\Users\u\.zeron\app\0.2.0\zeron.exe"),
+                Path::new(r"C:\Users\u\.kratos\app\0.2.0\kratos.exe"),
                 Some(Path::new(r"C:\Users\u")),
             ),
             InstallKind::Unmanaged
@@ -1022,7 +1022,7 @@ mod tests {
                 .contains("not supported on windows")
         );
         assert!(
-            apply_mac_app(&data_dir.join("Zeron.app"), &data_dir.join("Installed.app"))
+            apply_mac_app(&data_dir.join("Kratos.app"), &data_dir.join("Installed.app"))
                 .unwrap_err()
                 .to_string()
                 .contains("not supported on windows")
@@ -1038,12 +1038,12 @@ mod tests {
     #[test]
     fn manifest_parses_with_and_without_files() {
         let full: Manifest = serde_json::from_str(
-            r#"{"version":"0.1.1","files":{"zeron-0.1.1-linux-x86_64.tar.gz":{"sha256":"abc"}}}"#,
+            r#"{"version":"0.1.1","files":{"kratos-0.1.1-linux-x86_64.tar.gz":{"sha256":"abc"}}}"#,
         )
         .unwrap();
         assert_eq!(full.version, "0.1.1");
         assert_eq!(
-            full.files["zeron-0.1.1-linux-x86_64.tar.gz"]
+            full.files["kratos-0.1.1-linux-x86_64.tar.gz"]
                 .sha256
                 .as_deref(),
             Some("abc")
@@ -1059,7 +1059,7 @@ mod tests {
         let app_root = tmp.path().join("app");
         for ver in ["0.1.0", "0.1.1"] {
             std::fs::create_dir_all(app_root.join(ver)).unwrap();
-            std::fs::write(app_root.join(ver).join("zeron"), ver).unwrap();
+            std::fs::write(app_root.join(ver).join("kratos"), ver).unwrap();
         }
         apply_headless(&app_root, "0.1.0").unwrap();
         assert_eq!(

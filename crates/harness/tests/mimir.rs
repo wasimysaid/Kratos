@@ -4,8 +4,8 @@
 use futures::StreamExt;
 use std::{path::PathBuf, time::Duration};
 use tokio::sync::{mpsc, oneshot};
-use zeron_harness::{AcpHarness, CancellationToken, Harness, RunControls};
-use zeron_proto::{AgentEvent, DoneStatus, HarnessId, ReasoningLevel, RunRequest, SandboxLevel};
+use kratos_harness::{AcpHarness, CancellationToken, Harness, RunControls};
+use kratos_proto::{AgentEvent, DoneStatus, HarnessId, ReasoningLevel, RunRequest, SandboxLevel};
 
 fn harness() -> AcpHarness {
     AcpHarness::mimir().with_executable(
@@ -99,7 +99,7 @@ fn native_identity_uses_turn_boundaries() {
     assert_eq!(harness.display_name(), "Mimir");
     assert_eq!(
         harness.steering_mode(),
-        zeron_proto::SteeringMode::TurnBoundary
+        kratos_proto::SteeringMode::TurnBoundary
     );
     assert!(harness.authoritative_prompt_end());
 }

@@ -1,5 +1,5 @@
 //! Mimir-specific identity of provider-qualified models. Everything is configured
-//! through standard ACP selects; no native settings/journals are read by Zeron.
+//! through standard ACP selects; no native settings/journals are read by Kratos.
 
 use super::{boolean_config_value, config, models_from_session};
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
 };
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
-use zeron_proto::Model;
+use kratos_proto::Model;
 
 const PROVIDER: &str = "mimir.provider";
 const DISCONNECTED: &str = "mimir.disconnected";
@@ -77,7 +77,7 @@ pub(super) async fn select_provider(
 pub(super) fn validate_settings(
     state: &Value,
     model: Option<&str>,
-    reasoning: Option<zeron_proto::ReasoningLevel>,
+    reasoning: Option<kratos_proto::ReasoningLevel>,
     traits: &serde_json::Map<String, Value>,
 ) -> Result<(), HarnessError> {
     let verify = |option: Option<&Value>, expected: Value, label: &str| {

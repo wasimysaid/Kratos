@@ -11,10 +11,10 @@ use std::{
     },
     time::Duration,
 };
-use zeron_doc::{MessagePart, MessageRole, MessageStatus, SessionCommandPayload, SubagentStatus};
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_harness::{AcpHarness, Harness, HarnessError, RunControls};
-use zeron_proto::{
+use kratos_doc::{MessagePart, MessageRole, MessageStatus, SessionCommandPayload, SubagentStatus};
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_harness::{AcpHarness, Harness, HarnessError, RunControls};
+use kratos_proto::{
     AgentChild, AgentEvent, ChatConfig, ChildTranscript, DoneStatus, GoalPhase, HarnessId, Model,
     ReasoningLevel, RunRequest, SandboxLevel, SessionStatus, SteeringMode, ToolCall,
 };
@@ -404,7 +404,7 @@ async fn extension_absent_goal_control_stays_in_the_visible_turn_boundary_queue(
             .iter()
             .any(|command| {
                 command.id == command_id
-                    && command.status == zeron_doc::SessionCommandStatus::Applied
+                    && command.status == kratos_doc::SessionCommandStatus::Applied
             })
     })
     .await;
@@ -486,7 +486,7 @@ async fn negotiated_capability_survives_a_same_run_steered_boundary() {
             .unwrap()
             .iter()
             .any(|entry| {
-                entry.id == command && entry.status == zeron_doc::SessionCommandStatus::Applied
+                entry.id == command && entry.status == kratos_doc::SessionCommandStatus::Applied
             })
     })
     .await;
@@ -641,11 +641,11 @@ async fn active_goal_controls_bypass_queue_without_success_or_extra_model_lease(
             .find(|e| e.id == "duplicate-user")
             .unwrap()
             .status,
-        Some(zeron_doc::MessageStatus::Aborted)
+        Some(kratos_doc::MessageStatus::Aborted)
     );
     assert_eq!(
         users.iter().find(|e| e.id == "pause-user").unwrap().status,
-        Some(zeron_doc::MessageStatus::Complete)
+        Some(kratos_doc::MessageStatus::Complete)
     );
     assert_eq!(
         core.doc_host

@@ -14,6 +14,6 @@ run_test() {
   cargo test -p "$package" --test "$target" -- --test-threads=1
 }
 
-run_test zeron-engine real_tailcat
-run_test zeron-engine peer_preservation
-run_test zeron-sync peer_clients
+run_test kratos-engine real_tailcat
+run_test kratos-engine peer_preservation
+run_test kratos-sync peer_clients

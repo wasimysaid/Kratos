@@ -12,7 +12,7 @@ members = [
     "crates/update",
     "crates/ui",
     "crates/syntax",
-    "apps/zeron",
+    "apps/kratos",
 ]
 
 [workspace.package]
@@ -22,17 +22,17 @@ license = "MIT"
 publish = false
 
 [workspace.dependencies]
-zeron-proto = { path = "crates/proto" }
-zeron-preview = { path = "crates/preview" }
-zeron-doc = { path = "crates/doc" }
-zeron-sync = { path = "crates/sync" }
-zeron-harness = { path = "crates/harness" }
-zeron-engine = { path = "crates/engine" }
-zeron-rpc = { path = "crates/rpc" }
-zeron-update = { path = "crates/update" }
-zeron-ui = { path = "crates/ui" }
-zeron-syntax = { path = "crates/syntax" }
-zeron-theme = { path = "crates/theme" }
+kratos-proto = { path = "crates/proto" }
+kratos-preview = { path = "crates/preview" }
+kratos-doc = { path = "crates/doc" }
+kratos-sync = { path = "crates/sync" }
+kratos-harness = { path = "crates/harness" }
+kratos-engine = { path = "crates/engine" }
+kratos-rpc = { path = "crates/rpc" }
+kratos-update = { path = "crates/update" }
+kratos-ui = { path = "crates/ui" }
+kratos-syntax = { path = "crates/syntax" }
+kratos-theme = { path = "crates/theme" }
 
 # CRDT
 loro = "1.13"
@@ -49,7 +49,7 @@ loro = "1.13"
 # sidebar); a6c1ad5 adds BackdropBlur + horizontal EdgeFade + glass fixes;
 # 9b672fa bounds renderer GPU memory (region-sized backdrop blur scratch,
 # idle release of blur/path intermediates, instance pool shrink,
-# ZERON_GPU_STATS=1 diagnostics); b687328 adds ImageSource::evict (frees
+# KRATOS_GPU_STATS=1 diagnostics); b687328 adds ImageSource::evict (frees
 # sprite-atlas tiles — remove_asset alone leaked them, see
 # attachments::flush_evicted); ac135eb adds device memory to the stats line;
 # f596cde fixes destination alpha on transparent windows (Porter-Duff OVER,

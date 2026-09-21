@@ -1,7 +1,7 @@
 (() => {
   const optedOut = () => navigator.globalPrivacyControl === true || ["1", "yes"].includes(navigator.doNotTrack);
   if (
-    !["https://zeron.sh", "https://comet.zeron.sh"].includes(location.origin) ||
+    !["https://kratos.sh", "https://comet.kratos.sh"].includes(location.origin) ||
     !["/", "/index.html"].includes(location.pathname) ||
     optedOut() || typeof fetch !== "function" ||
     typeof crypto === "undefined" || typeof crypto.randomUUID !== "function"

@@ -18,7 +18,7 @@
 //!   turn (`cancelled` → Interrupted, `refusal` → Errored, else Completed).
 //! - `session/update` notifications normalize per [`normalize::map_update`].
 //! - Permission requests auto-accept with the agent's preferred allow option
-//!   (zeron sessions run unattended); question-shaped requests block on the
+//!   (kratos sessions run unattended); question-shaped requests block on the
 //!   engine's input bridge.
 //! - Steering: agents advertising `_session/steering` get mid-turn injection;
 //!   others queue steers and deliver them as the next `session/prompt` at the
@@ -49,7 +49,7 @@ use serde_json::{Value, json};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
 
-use zeron_proto::{
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, Model, ModelOption, ModelOptionChoice, ReasoningLevel,
     RunRequest, SlashCommand, SteeringMode, UserInputAnswer, UserInputQuestion,
 };
@@ -199,7 +199,7 @@ fn grok_spec() -> AcpAgentSpec {
         // the `agent` subcommand and starts a fresh agent even when
         // `[cli] use_leader` is set — leader mode ATTACHES `agent stdio` to a
         // shared process via ~/.grok/leader.sock, so a wedged/stale leader
-        // (the user's TUI) reads as total silent non-response in zeron.
+        // (the user's TUI) reads as total silent non-response in kratos.
         args: &["--no-auto-update", "agent", "--no-leader", "stdio"],
         npm_package: Some("@xai-official/grok@1.0.4"),
         extra_paths: grok_install_paths,
@@ -240,7 +240,7 @@ fn grok_spec() -> AcpAgentSpec {
         prompt_complete_extension: true,
         prompt_stall: Some(Duration::from_secs(30)),
         stall_hint: "The agent process is likely wedged — a stale shared leader \
-             process or a hung startup check; zeron launches it with --no-leader \
+             process or a hung startup check; kratos launches it with --no-leader \
              and --no-auto-update to avoid both.",
     }
 }
@@ -433,7 +433,7 @@ fn pi_spec() -> AcpAgentSpec {
         cli_executable: "pi",
         cli_extra_paths: || npm_global_bins("pi"),
         install_hint: "pi-acp (searched PATH, the login shell's PATH, npm global bins, \
-             and fnm/nvm/volta/pnpm/bun install dirs; zeron installs the pinned \
+             and fnm/nvm/volta/pnpm/bun install dirs; kratos installs the pinned \
              pi-acp automatically when npm is available — the pi CLI itself is \
              still required, `npm install -g --ignore-scripts \
              @earendil-works/pi-coding-agent`; set PI_ACP_EXECUTABLE to override)",
@@ -458,7 +458,7 @@ fn pi_spec() -> AcpAgentSpec {
         },
         // The adapter has no `_session/steering` extension: turn boundaries.
         steering_mode: SteeringMode::TurnBoundary,
-        // pi's thinking ladder (minimal→max; its extra "off" tier has no zeron
+        // pi's thinking ladder (minimal→max; its extra "off" tier has no kratos
         // equivalent and is left to the agent default).
         reasoning_levels: &[
             ReasoningLevel::Minimal,
@@ -502,12 +502,12 @@ pub fn prewarm_managed_adapters() {
         handle.spawn(async move {
             match crate::adapter_install::ensure_installed(pin, bin_name, display_name).await {
                 Ok(entry) => tracing::info!(
-                    target: "zeron_harness::adapter_install",
+                    target: "kratos_harness::adapter_install",
                     adapter = %entry.display(),
                     "prewarmed {display_name} ACP adapter"
                 ),
                 Err(e) => tracing::warn!(
-                    target: "zeron_harness::adapter_install",
+                    target: "kratos_harness::adapter_install",
                     "prewarm of the {display_name} ACP adapter failed: {e}"
                 ),
             }
@@ -726,7 +726,7 @@ impl AcpHarness {
                             .await
                             {
                                 tracing::warn!(
-                                    target: "zeron_harness::adapter_install",
+                                    target: "kratos_harness::adapter_install",
                                     "background adapter install failed: {e}"
                                 );
                             }
@@ -775,7 +775,7 @@ impl AcpHarness {
             tokio::spawn(async move {
                 let mut lines = tokio::io::BufReader::new(stderr).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    tracing::debug!(target: "zeron_harness::acp", "stderr: {line}");
+                    tracing::debug!(target: "kratos_harness::acp", "stderr: {line}");
                     tail.push(&line);
                 }
             });
@@ -915,7 +915,7 @@ impl AcpHarness {
     }
 }
 
-/// Map an advertised `thought_level` value id onto zeron's ladder.
+/// Map an advertised `thought_level` value id onto kratos's ladder.
 fn reasoning_from_value(value: &str) -> Option<ReasoningLevel> {
     match norm_id(value).as_str() {
         "off" => Some(ReasoningLevel::Off),
@@ -1091,12 +1091,12 @@ fn models_from_session(session_response: &Value, catalog: &[Model]) -> Vec<Model
 }
 
 /// A session config option surfaced as a Traits-dropdown section. Mode is
-/// zeron's own (forced to the no-prompts choice), model rides the model rows,
+/// kratos's own (forced to the no-prompts choice), model rides the model rows,
 /// and thought_level is the Reasoning ladder — everything else the agent
 /// advertises (fast mode, collaboration mode, agent persona, …) passes
 /// through. `currentValue` doubles as the default: it is the state the
 /// session opens in. Booleans render as an off/on select, mirroring the
-/// catalogs (zeron never declares the boolean config capability, so adapters
+/// catalogs (kratos never declares the boolean config capability, so adapters
 /// send selects, but handle the shape defensively).
 fn trait_from_config_option(option: &Value) -> Option<ModelOption> {
     if matches!(
@@ -1105,7 +1105,7 @@ fn trait_from_config_option(option: &Value) -> Option<ModelOption> {
     ) {
         return None;
     }
-    // Permission/sandbox modes remain owned by Zeron's approval policy.
+    // Permission/sandbox modes remain owned by Kratos's approval policy.
     // Workflow modes (Build/Plan/Ask) are user-selectable traits.
     if option["category"] == "mode"
         && option["options"].as_array().is_some_and(|choices| {
@@ -1375,7 +1375,7 @@ fn initialize_params(harness: HarnessId) -> Value {
         // Devin otherwise exposes only the parent's run_subagent call. This
         // unlocks lifecycle tags plus every nested message, thought, and tool
         // update, all of which DevinTracker can route. Do not advertise the
-        // separate subagentControl extension: Zeron has no matching UI yet.
+        // separate subagentControl extension: Kratos has no matching UI yet.
         capabilities["_meta"] = json!({ "cognition.ai/subagentSupport": true });
     }
     if harness == HarnessId::Mimir {
@@ -1384,12 +1384,12 @@ fn initialize_params(harness: HarnessId) -> Value {
     json!({
         "protocolVersion": 1,
         "clientInfo": {
-            "name": "zeron",
-            "title": "Zeron",
+            "name": "kratos",
+            "title": "Kratos",
             "version": env!("CARGO_PKG_VERSION"),
         },
         // Declined: agents fall back to their own fs/terminal access, which
-        // is what zeron wants — the working tree is the source of truth for
+        // is what kratos wants — the working tree is the source of truth for
         // the diff pane, and commands belong to the agent's own sandbox.
         "clientCapabilities": capabilities,
     })
@@ -1553,7 +1553,7 @@ fn first_class_model_change(
     Ok(Some(requested.to_owned()))
 }
 
-/// Translate zeron's boolean trait values to the ACP value carried by a
+/// Translate kratos's boolean trait values to the ACP value carried by a
 /// `type=boolean` config option. Unknown values stay invalid rather than
 /// silently becoming false.
 pub(super) fn boolean_config_value(value: &Value) -> Option<Value> {
@@ -1828,7 +1828,7 @@ fn prompt_content_turn(
 
 /// Answer a server→client request. Permission requests are auto-accepted with
 /// the agent's preferred allow option — parity with the claude harness's
-/// bypassPermissions and the codex harness's approvalPolicy "never" (zeron
+/// bypassPermissions and the codex harness's approvalPolicy "never" (kratos
 /// sessions run unattended). Everything else (fs, terminal, elicitation) was
 /// declined at initialize, so a stray request gets method-not-found rather
 /// than wedging the agent.
@@ -1855,7 +1855,7 @@ fn handle_server_request(
             Vec::new()
         }
         _ => {
-            tracing::debug!(target: "zeron_harness::acp", "unhandled server request: {method}");
+            tracing::debug!(target: "kratos_harness::acp", "unhandled server request: {method}");
             client.respond_error(&id, -32601, &format!("unsupported method: {method}"));
             Vec::new()
         }
@@ -2146,7 +2146,7 @@ async fn run_session(session: Session) {
                 // A missing/foreign session falls back to a fresh one.
                 Err(e) => {
                     tracing::debug!(
-                        target: "zeron_harness::acp",
+                        target: "kratos_harness::acp",
                         "session/load failed (starting fresh): {e}"
                     );
                     let new = request_draining(
@@ -2290,7 +2290,7 @@ async fn run_session(session: Session) {
                             None => e.to_string(),
                         },
                     };
-                    tracing::warn!(target: "zeron_harness::acp", %error, "agent setup failed");
+                    tracing::warn!(target: "kratos_harness::acp", %error, "agent setup failed");
                     let _ = event_tx
                         .send(Ok(AgentEvent::Done {
                             status: DoneStatus::Errored,
@@ -2384,8 +2384,8 @@ async fn run_session(session: Session) {
     let mut prompt_seq: u64 = 0;
     let mut current_prompt_id: Option<String> = None;
     let mut completed_prompts: VecDeque<String> = VecDeque::new();
-    // `ZERON_ACP_PROMPT_STALL_MS` overrides the spec's bound; 0 disables.
-    let prompt_stall: Option<Duration> = match std::env::var("ZERON_ACP_PROMPT_STALL_MS")
+    // `KRATOS_ACP_PROMPT_STALL_MS` overrides the spec's bound; 0 disables.
+    let prompt_stall: Option<Duration> = match std::env::var("KRATOS_ACP_PROMPT_STALL_MS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
     {
@@ -2397,7 +2397,7 @@ async fn run_session(session: Session) {
         prompt_stall.map(|d| tokio::time::Instant::now() + d);
     let mut turn: Option<BoxFuture<'static, Result<Value, HarnessError>>> = Some({
         prompt_seq += 1;
-        current_prompt_id = prompt_complete_extension.then(|| format!("zeron-p{prompt_seq}"));
+        current_prompt_id = prompt_complete_extension.then(|| format!("kratos-p{prompt_seq}"));
         prompt_content_turn(
             client.clone(),
             session_id.clone(),
@@ -2446,7 +2446,7 @@ async fn run_session(session: Session) {
     // Silence is not a turn boundary: completed tools, text, and usage may
     // all precede a slow model request. Keep the prompt future alive until
     // its response (or an authoritative completion extension) arrives.
-    // ZERON_ACP_QUIET_SETTLE_MS is intentionally no longer honored (#296).
+    // KRATOS_ACP_QUIET_SETTLE_MS is intentionally no longer honored (#296).
     let mut last_update_at = tokio::time::Instant::now();
     let mut open_tools: std::collections::HashSet<String> = std::collections::HashSet::new();
     // PREVENTION, ahead of all the recovery above: never send a
@@ -2642,7 +2642,7 @@ async fn run_session(session: Session) {
                     last_update_at = tokio::time::Instant::now();
                     prompt_seq += 1;
                     current_prompt_id =
-                        prompt_complete_extension.then(|| format!("zeron-p{prompt_seq}"));
+                        prompt_complete_extension.then(|| format!("kratos-p{prompt_seq}"));
                     prompt_stall_deadline =
                         prompt_stall.map(|d| tokio::time::Instant::now() + d);
                     turn = Some(prompt_turn(
@@ -2805,7 +2805,7 @@ async fn run_session(session: Session) {
                         .to_owned(),
                     Err(e) => {
                         tracing::debug!(
-                            target: "zeron_harness::acp",
+                            target: "kratos_harness::acp",
                             "_session/steering failed (redelivering): {e}"
                         );
                         // Failed calls redeliver like a lost turn-end race.
@@ -2903,7 +2903,7 @@ async fn run_session(session: Session) {
                         == Some("noRunningTurn")
                     {
                         tracing::warn!(
-                            target: "zeron_harness::acp",
+                            target: "kratos_harness::acp",
                             "steering answered noRunningTurn with a prompt \
                              outstanding; arming starved-turn recovery"
                         );
@@ -2932,7 +2932,7 @@ async fn run_session(session: Session) {
                     last_update_at = tokio::time::Instant::now();
                     prompt_seq += 1;
                     current_prompt_id =
-                        prompt_complete_extension.then(|| format!("zeron-p{prompt_seq}"));
+                        prompt_complete_extension.then(|| format!("kratos-p{prompt_seq}"));
                     prompt_stall_deadline =
                         prompt_stall.map(|d| tokio::time::Instant::now() + d);
                     turn = Some(prompt_turn(
@@ -2981,7 +2981,7 @@ async fn run_session(session: Session) {
                     last_update_at = tokio::time::Instant::now();
                     prompt_seq += 1;
                     current_prompt_id =
-                        prompt_complete_extension.then(|| format!("zeron-p{prompt_seq}"));
+                        prompt_complete_extension.then(|| format!("kratos-p{prompt_seq}"));
                     prompt_stall_deadline =
                         prompt_stall.map(|d| tokio::time::Instant::now() + d);
                     turn = Some(prompt_turn(
@@ -3005,7 +3005,7 @@ async fn run_session(session: Session) {
             ), if starve_deadline.is_some() && turn.is_some() && !interrupted => {
                 starve_deadline = None;
                 tracing::warn!(
-                    target: "zeron_harness::acp",
+                    target: "kratos_harness::acp",
                     "prompt response missing past turn-end evidence; settling \
                      the dead turn (and promoting any queued steer)"
                 );
@@ -3053,7 +3053,7 @@ async fn run_session(session: Session) {
                     last_update_at = tokio::time::Instant::now();
                     prompt_seq += 1;
                     current_prompt_id =
-                        prompt_complete_extension.then(|| format!("zeron-p{prompt_seq}"));
+                        prompt_complete_extension.then(|| format!("kratos-p{prompt_seq}"));
                     prompt_stall_deadline =
                         prompt_stall.map(|d| tokio::time::Instant::now() + d);
                     turn = Some(prompt_turn(
@@ -3071,7 +3071,7 @@ async fn run_session(session: Session) {
 
             steer = steering.recv(), if steering_open && !interrupted => match steer {
                 Some(msg) => {
-                    if native_caps.goal && let Some(command) = zeron_proto::goal_control_command(&msg.prompt) {
+                    if native_caps.goal && let Some(command) = kratos_proto::goal_control_command(&msg.prompt) {
                         if control_call.is_some() {
                             if !send(&event_tx, AgentEvent::ControlResolved { prompt: msg.prompt, message_id: msg.message_id, error: Some("A goal control is already pending; retry after its response.".into()) }).await { break 'main; }
                         } else {
@@ -3100,7 +3100,7 @@ async fn run_session(session: Session) {
                         // cancel it rather than prompt into the starve.
                         //
                         tracing::info!(
-                            target: "zeron_harness::acp",
+                            target: "kratos_harness::acp",
                             "steer into a self-continuing session; cancelling \
                              the unowned turn before prompting"
                         );
@@ -3130,7 +3130,7 @@ async fn run_session(session: Session) {
                         last_update_at = tokio::time::Instant::now();
                         prompt_seq += 1;
                     current_prompt_id =
-                        prompt_complete_extension.then(|| format!("zeron-p{prompt_seq}"));
+                        prompt_complete_extension.then(|| format!("kratos-p{prompt_seq}"));
                     prompt_stall_deadline =
                         prompt_stall.map(|d| tokio::time::Instant::now() + d);
                     turn = Some(prompt_turn(

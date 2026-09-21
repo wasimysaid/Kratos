@@ -23,5 +23,5 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Preview discovery and authenticated durable-peer relay
         run: |
-          cargo test --locked -p zeron-preview
-          cargo test --locked -p zeron-engine --test peer_preview
+          cargo test --locked -p kratos-preview
+          cargo test --locked -p kratos-engine --test peer_preview

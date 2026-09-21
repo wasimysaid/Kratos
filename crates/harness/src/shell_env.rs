@@ -20,7 +20,7 @@
 //!   printing (or grandchildren inheriting the pipe) can't wedge us.
 //! - A hard per-attempt timeout kills the shell.
 //!
-//! Set `ZERON_NO_LOGIN_SHELL=1` to disable the snapshot entirely.
+//! Set `KRATOS_NO_LOGIN_SHELL=1` to disable the snapshot entirely.
 
 use std::ffi::{OsStr, OsString};
 use std::sync::OnceLock;
@@ -47,7 +47,7 @@ pub fn prewarm() {
     #[cfg(unix)]
     {
         let _ = std::thread::Builder::new()
-            .name("zeron-shell-env".into())
+            .name("kratos-shell-env".into())
             .spawn(|| {
                 let _ = login_shell_path();
             });
@@ -64,8 +64,8 @@ mod unix {
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
-    const BEGIN_MARKER: &str = "__ZERON_SHELL_ENV_BEGIN__";
-    const END_MARKER: &str = "__ZERON_SHELL_ENV_END__";
+    const BEGIN_MARKER: &str = "__KRATOS_SHELL_ENV_BEGIN__";
+    const END_MARKER: &str = "__KRATOS_SHELL_ENV_END__";
     /// Enough for any sane environment; a runaway rc file can't OOM us.
     const MAX_OUTPUT: usize = 2 * 1024 * 1024;
     const ATTEMPT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -73,7 +73,7 @@ mod unix {
     const EXIT_FLUSH_GRACE: Duration = Duration::from_millis(250);
 
     pub(super) fn capture() -> Option<OsString> {
-        if std::env::var_os("ZERON_NO_LOGIN_SHELL").is_some_and(|v| !v.is_empty()) {
+        if std::env::var_os("KRATOS_NO_LOGIN_SHELL").is_some_and(|v| !v.is_empty()) {
             return None;
         }
         let shell = user_shell()?;
@@ -157,10 +157,10 @@ mod unix {
         let mut cmd = std::process::Command::new(shell);
 
         // An interactive shell performs job-control setup against /dev/tty.
-        // When Zeron itself belongs to a background process group (detached
+        // When Kratos itself belongs to a background process group (detached
         // daemon/test runner), bash sends SIGTTIN to that entire group before
         // our timeout can run. Put only the probe in a fresh session: it has
-        // no controlling terminal, so shell job control cannot stop Zeron.
+        // no controlling terminal, so shell job control cannot stop Kratos.
         use std::os::unix::process::CommandExt as _;
         unsafe {
             cmd.pre_exec(|| {
@@ -182,7 +182,7 @@ mod unix {
             .stderr(Stdio::null())
             // Let rc files detect (and skip work for) this probe, mirroring
             // VSCODE_RESOLVING_ENVIRONMENT; TERM=dumb quiets fancy prompts.
-            .env("ZERON_RESOLVING_ENVIRONMENT", "1")
+            .env("KRATOS_RESOLVING_ENVIRONMENT", "1")
             .env("TERM", "dumb");
         let Ok(mut child) = cmd.spawn() else {
             return Vec::new();
@@ -191,7 +191,7 @@ mod unix {
         if let Some(mut stdout) = child.stdout.take() {
             let buf = Arc::clone(&buf);
             let _ = std::thread::Builder::new()
-                .name("zeron-shell-env-read".into())
+                .name("kratos-shell-env-read".into())
                 .spawn(move || {
                     let mut chunk = [0u8; 8192];
                     loop {
@@ -327,12 +327,12 @@ exit 1
             let shell = fake_shell(
                 dir.path(),
                 &format!(
-                    "#!/bin/sh\nPATH=\"/zeron-test/custom/bin:/usr/bin:/bin\"; export PATH\n{RUN_PAYLOAD}"
+                    "#!/bin/sh\nPATH=\"/kratos-test/custom/bin:/usr/bin:/bin\"; export PATH\n{RUN_PAYLOAD}"
                 ),
             );
             let path = snapshot_path(&shell, Duration::from_secs(10)).unwrap();
             let path = path.to_string_lossy();
-            assert!(path.starts_with("/zeron-test/custom/bin:"), "got: {path}");
+            assert!(path.starts_with("/kratos-test/custom/bin:"), "got: {path}");
         }
 
         #[test]
@@ -343,14 +343,14 @@ exit 1
             let shell = fake_shell(
                 dir.path(),
                 &format!(
-                    "#!/bin/sh\ncase \" $* \" in *\" -i \"*) sleep 60;; esac\nPATH=\"/zeron-test/fallback/bin:/bin\"; export PATH\n{RUN_PAYLOAD}"
+                    "#!/bin/sh\ncase \" $* \" in *\" -i \"*) sleep 60;; esac\nPATH=\"/kratos-test/fallback/bin:/bin\"; export PATH\n{RUN_PAYLOAD}"
                 ),
             );
             let start = Instant::now();
             let path = snapshot_path(&shell, Duration::from_millis(400)).unwrap();
             assert!(
                 path.to_string_lossy()
-                    .starts_with("/zeron-test/fallback/bin"),
+                    .starts_with("/kratos-test/fallback/bin"),
                 "got: {}",
                 path.to_string_lossy()
             );

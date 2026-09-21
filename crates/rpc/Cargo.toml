@@ -1,13 +1,13 @@
 [package]
-name = "zeron-rpc"
+name = "kratos-rpc"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
-zeron-proto.workspace = true
-zeron-sync.workspace = true
+kratos-proto.workspace = true
+kratos-sync.workspace = true
 tokio.workspace = true
 tokio-tungstenite.workspace = true
 futures.workspace = true
@@ -20,4 +20,4 @@ tracing.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-zeron-doc.workspace = true
+kratos-doc.workspace = true

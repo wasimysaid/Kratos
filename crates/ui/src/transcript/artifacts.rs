@@ -200,7 +200,7 @@ impl Transcript {
     pub(super) fn render_checklist(
         &self,
         row_id: &SharedString,
-        items: &[zeron_proto::TodoItem],
+        items: &[kratos_proto::TodoItem],
         theme: &Theme,
         cx: &mut Context<Self>,
     ) -> AnyElement {

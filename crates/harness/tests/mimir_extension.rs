@@ -3,8 +3,8 @@
 use futures::StreamExt;
 use std::{path::PathBuf, time::Duration};
 use tokio::sync::{mpsc, oneshot};
-use zeron_harness::{AcpHarness, CancellationToken, Harness, RunControls, SteerMessage};
-use zeron_proto::{AgentEvent, DoneStatus, GoalPhase, HarnessId, RunRequest, SandboxLevel};
+use kratos_harness::{AcpHarness, CancellationToken, Harness, RunControls, SteerMessage};
+use kratos_proto::{AgentEvent, DoneStatus, GoalPhase, HarnessId, RunRequest, SandboxLevel};
 
 #[tokio::test]
 async fn goal_control_owns_no_model_turn_and_child_revisions_replace_and_stop() {

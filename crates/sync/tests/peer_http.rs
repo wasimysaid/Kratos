@@ -10,8 +10,8 @@ use axum::{
 use base64::Engine as _;
 use reqwest::StatusCode;
 use tempfile::TempDir;
-use zeron_sync::chat_frames::{self, frame_type};
-use zeron_sync::peer::{PeerPrincipal, PeerStore, router};
+use kratos_sync::chat_frames::{self, frame_type};
+use kratos_sync::peer::{PeerPrincipal, PeerStore, router};
 
 async fn principal(mut req: Request<Body>, next: Next) -> Response {
     let profile = req

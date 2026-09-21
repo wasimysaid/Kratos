@@ -15,15 +15,15 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures::stream::BoxStream;
 
-use zeron_doc::{
+use kratos_doc::{
     MessagePart, MessageRole, QueueDeliveryGate, SessionCommandPayload, SessionMessageEntry,
 };
-use zeron_engine::doc_host::{
+use kratos_engine::doc_host::{
     BeginQueueEditOutcome, FinishQueueEditAction, FinishQueueEditOutcome,
 };
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_harness::{Harness, HarnessError, RunControls};
-use zeron_proto::{
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_harness::{Harness, HarnessError, RunControls};
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, Model, ReasoningLevel, RunRequest, SteeringMode,
     UserInputQuestion,
 };
@@ -243,10 +243,10 @@ fn assemble_at(path: &std::path::Path, harness: Arc<HeldHarness>) -> EngineCore 
 }
 
 async fn create_chat(core: &EngineCore) {
-    let client = zeron_rpc::memory_client(core.rpc_service());
+    let client = kratos_rpc::memory_client(core.rpc_service());
     client
         .call(
-            zeron_rpc::methods::MUTATE,
+            kratos_rpc::methods::MUTATE,
             serde_json::json!({
                 "op": "createChat",
                 "chatId": CHAT,
@@ -607,7 +607,7 @@ async fn queued_text_waits_for_a_steerable_turn_even_with_legacy_policy() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn held_policy_keeps_a_steerable_message_visible_until_steer_now() {
     let (core, harness, prompts) = setup(SteeringMode::StepBoundary).await;
-    let client = zeron_rpc::memory_client(core.rpc_service());
+    let client = kratos_rpc::memory_client(core.rpc_service());
 
     core.doc_host
         .queue_message(CHAT, "opening", Vec::new())
@@ -620,7 +620,7 @@ async fn held_policy_keeps_a_steerable_message_visible_until_steer_now() {
 
     let reply = client
         .call(
-            zeron_rpc::methods::QUEUE_MESSAGE,
+            kratos_rpc::methods::QUEUE_MESSAGE,
             serde_json::json!({
                 "chatId": CHAT,
                 "text": "hold this",
@@ -636,7 +636,7 @@ async fn held_policy_keeps_a_steerable_message_visible_until_steer_now() {
 
     let reply = client
         .call(
-            zeron_rpc::methods::STEER_QUEUED_MESSAGE_NOW,
+            kratos_rpc::methods::STEER_QUEUED_MESSAGE_NOW,
             serde_json::json!({ "chatId": CHAT, "id": id }),
         )
         .await
@@ -693,10 +693,10 @@ async fn steer_now_starts_the_next_turn_when_the_previous_turn_is_already_idle()
     )
     .await;
 
-    let client = zeron_rpc::memory_client(core.rpc_service());
+    let client = kratos_rpc::memory_client(core.rpc_service());
     let reply = client
         .call(
-            zeron_rpc::methods::QUEUE_MESSAGE,
+            kratos_rpc::methods::QUEUE_MESSAGE,
             serde_json::json!({
                 "chatId": CHAT,
                 "text": "after cancel",
@@ -932,7 +932,7 @@ async fn acknowledged_removal_cannot_materialize_after_turn_end() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn queue_rpc_reorders_and_streams() {
     let (core, harness, prompts) = setup(SteeringMode::TurnBoundary).await;
-    let client = zeron_rpc::memory_client(core.rpc_service());
+    let client = kratos_rpc::memory_client(core.rpc_service());
 
     core.doc_host
         .queue_message(CHAT, "opening", Vec::new())
@@ -945,7 +945,7 @@ async fn queue_rpc_reorders_and_streams() {
 
     let mut rx = client
         .subscribe(
-            zeron_rpc::methods::WATCH_QUEUE,
+            kratos_rpc::methods::WATCH_QUEUE,
             serde_json::json!({ "chatId": CHAT }),
         )
         .await
@@ -963,7 +963,7 @@ async fn queue_rpc_reorders_and_streams() {
     for text in ["a", "b", "c"] {
         client
             .call(
-                zeron_rpc::methods::QUEUE_MESSAGE,
+                kratos_rpc::methods::QUEUE_MESSAGE,
                 serde_json::json!({ "chatId": CHAT, "text": text }),
             )
             .await
@@ -984,7 +984,7 @@ async fn queue_rpc_reorders_and_streams() {
         .clone();
     client
         .call(
-            zeron_rpc::methods::MOVE_QUEUED_MESSAGE,
+            kratos_rpc::methods::MOVE_QUEUED_MESSAGE,
             serde_json::json!({ "chatId": CHAT, "id": last_id, "toIndex": 0 }),
         )
         .await
@@ -993,7 +993,7 @@ async fn queue_rpc_reorders_and_streams() {
 
     client
         .call(
-            zeron_rpc::methods::REMOVE_QUEUED_MESSAGE,
+            kratos_rpc::methods::REMOVE_QUEUED_MESSAGE,
             serde_json::json!({ "chatId": CHAT, "id": last_id }),
         )
         .await
@@ -1108,7 +1108,7 @@ async fn a_message_holds_while_the_agent_waits_on_a_question() {
         || {
             core.sessions
                 .session_status(CHAT)
-                .is_some_and(|s| s.status == zeron_proto::SessionStatus::AwaitingInput)
+                .is_some_and(|s| s.status == kratos_proto::SessionStatus::AwaitingInput)
         },
         "the agent to park on its question",
     )
@@ -1312,10 +1312,10 @@ async fn protected_edit_rpc_round_trips_its_camel_case_protocol() {
         .doc_host
         .queue_message(CHAT, "rpc edit", Vec::new())
         .expect("queue row");
-    let client = zeron_rpc::memory_client(core.rpc_service());
+    let client = kratos_rpc::memory_client(core.rpc_service());
     let begin = client
         .call(
-            zeron_rpc::methods::BEGIN_QUEUED_MESSAGE_EDIT,
+            kratos_rpc::methods::BEGIN_QUEUED_MESSAGE_EDIT,
             serde_json::json!({
                 "chatId": CHAT,
                 "id": id,
@@ -1330,7 +1330,7 @@ async fn protected_edit_rpc_round_trips_its_camel_case_protocol() {
 
     let finish = client
         .call(
-            zeron_rpc::methods::FINISH_QUEUED_MESSAGE_EDIT,
+            kratos_rpc::methods::FINISH_QUEUED_MESSAGE_EDIT,
             serde_json::json!({
                 "chatId": CHAT,
                 "id": id,
@@ -1474,12 +1474,12 @@ async fn failed_queue_dispatch_stays_paused_until_explicit_retry() {
 async fn queued_turn_uses_current_config_at_turn_end_and_send_now() {
     for send_now in [false, true] {
         let (core, harness, prompts) = setup(SteeringMode::TurnBoundary).await;
-        let mut config = zeron_proto::ChatConfig {
+        let mut config = kratos_proto::ChatConfig {
             harness: HarnessId::Mock,
             model: Some("old-model".into()),
             reasoning: Some(ReasoningLevel::Medium),
             model_options: Default::default(),
-            sandbox: zeron_proto::SandboxLevel::WorkspaceWrite,
+            sandbox: kratos_proto::SandboxLevel::WorkspaceWrite,
         };
         core.workspace.set_chat_config(CHAT, &config).unwrap();
         core.doc_host

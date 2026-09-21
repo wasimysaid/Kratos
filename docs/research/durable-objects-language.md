@@ -4,11 +4,11 @@
 
 Superseded by the Tailcat durable-peer architecture in `ARCHITECTURE.md` and `docs/tailcat-replacement.md`.
 
-This note originally compared TypeScript and Rust implementations for a Cloudflare Durable Objects backend. That comparison informed the retired deployment, but it is no longer a runtime or deployment recommendation. Zeron now uses an application-managed Tailcat adapter for connectivity and a Rust headless engine as the authenticated durable sync/storage peer. No Durable Object, Worker, R2 bucket, WorkOS route, or provider SDK is required by production.
+This note originally compared TypeScript and Rust implementations for a Cloudflare Durable Objects backend. That comparison informed the retired deployment, but it is no longer a runtime or deployment recommendation. Kratos now uses an application-managed Tailcat adapter for connectivity and a Rust headless engine as the authenticated durable sync/storage peer. No Durable Object, Worker, R2 bucket, WorkOS route, or provider SDK is required by production.
 
 ## Why the old decision no longer applies
 
-The decisive architectural change is not the language used inside a Durable Object. Tailcat supplies a private TCP path, while the Zeron peer owns application authentication and the existing chat2/registry protocols. The peer persists update rows, checkpoints, sidecars, attachment custody, deduplication state, and backups in profile-scoped SQLite storage. This removes the hosted edge service rather than rewriting it in another language.
+The decisive architectural change is not the language used inside a Durable Object. Tailcat supplies a private TCP path, while the Kratos peer owns application authentication and the existing chat2/registry protocols. The peer persists update rows, checkpoints, sidecars, attachment custody, deduplication state, and backups in profile-scoped SQLite storage. This removes the hosted edge service rather than rewriting it in another language.
 
 The active design preserves the useful parts of the former system:
 

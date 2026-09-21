@@ -446,9 +446,9 @@ mod tests {
     fn search_matches_words_across_chat_metadata() {
         assert!(matches_query(
             "mac auth",
-            "Fix authentication Zeron @ MacBook main"
+            "Fix authentication Kratos @ MacBook main"
         ));
         assert!(matches_query("  ", "Any chat"));
-        assert!(!matches_query("mac windows", "Zeron @ MacBook"));
+        assert!(!matches_query("mac windows", "Kratos @ MacBook"));
     }
 }

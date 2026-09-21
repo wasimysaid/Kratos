@@ -19,8 +19,8 @@ use super::windows_archive::{
 const ARCHIVE: &str = "update.zip";
 const ARCHIVE_DIGEST: &str = "archive.sha256";
 const PAYLOAD_DIR: &str = "payload";
-const STAGE_MARKER: &str = ".zeron-update-stage";
-const HELPER_PREFIX: &str = ".zeron-update-helper-";
+const STAGE_MARKER: &str = ".kratos-update-stage";
+const HELPER_PREFIX: &str = ".kratos-update-helper-";
 
 #[derive(serde::Deserialize)]
 struct Config {
@@ -52,9 +52,9 @@ pub(super) fn release_url() -> anyhow::Result<Option<String>> {
 }
 
 /// The complete portable package is the update unit. Tailcat deliberately has
-/// no wire/API stability promise, so updating only zeron.exe is unsafe.
+/// no wire/API stability promise, so updating only kratos.exe is unsafe.
 pub fn artifact(version: &str) -> String {
-    format!("zeron-{version}-windows-{}.zip", std::env::consts::ARCH)
+    format!("kratos-{version}-windows-{}.zip", std::env::consts::ARCH)
 }
 
 pub async fn stage(
@@ -90,7 +90,7 @@ async fn stage_from_base(
     );
 
     let temporary = tempfile::Builder::new()
-        .prefix(".zeron-update-")
+        .prefix(".kratos-update-")
         .tempdir_in(directory)?;
     let archive = temporary.path().join(ARCHIVE);
     super::download_release_file_from_base(base, manifest, &file, &archive).await?;
@@ -117,7 +117,7 @@ async fn verify_app_version(app: &Path, version: &str) -> anyhow::Result<()> {
     .context("staged executable version check timed out")??;
     ensure!(
         output.status.success()
-            && String::from_utf8_lossy(&output.stdout).trim() == format!("zeron {version}"),
+            && String::from_utf8_lossy(&output.stdout).trim() == format!("kratos {version}"),
         "staged executable has the wrong version or cannot run"
     );
     Ok(())
@@ -254,9 +254,9 @@ fn wait_for_exit_impl(pid: u32) -> anyhow::Result<()> {
 const HELPER_SCRIPT: &str = r#"param([uint32]$PidToWait,[string]$Install,[string]$Stage,[string]$Relaunch)
 $ErrorActionPreference = 'Stop'
 $names = @(
-  @('zeron.exe','.zeron-update-incoming-zeron.exe','.zeron-update-backup-zeron.exe'),
-  @('kratos-tailcat.exe','.zeron-update-incoming-kratos-tailcat.exe','.zeron-update-backup-kratos-tailcat.exe'),
-  @('zeron-update.json','.zeron-update-incoming-config.json','.zeron-update-backup-config.json')
+  @('kratos.exe','.kratos-update-incoming-kratos.exe','.kratos-update-backup-kratos.exe'),
+  @('kratos-tailcat.exe','.kratos-update-incoming-kratos-tailcat.exe','.kratos-update-backup-kratos-tailcat.exe'),
+  @('kratos-update.json','.kratos-update-incoming-config.json','.kratos-update-backup-config.json')
 )
 try { Wait-Process -Id $PidToWait -ErrorAction SilentlyContinue } catch {}
 $done = @()
@@ -267,10 +267,10 @@ try {
     [IO.File]::Replace($incoming, $dst, $backup, $true)
     $done += ,$n
   }
-  Remove-Item -LiteralPath (Join-Path $Install '.zeron-update-pending') -Force
+  Remove-Item -LiteralPath (Join-Path $Install '.kratos-update-pending') -Force
   foreach ($n in $names) { Remove-Item -LiteralPath (Join-Path $Install $n[2]) -Force -ErrorAction SilentlyContinue }
-  if (Test-Path -LiteralPath (Join-Path $Stage '.zeron-update-stage')) { Remove-Item -LiteralPath $Stage -Recurse -Force }
-  if ($Relaunch -eq '1') { Start-Process -FilePath (Join-Path $Install 'zeron.exe') -ArgumentList @('--wait-for-exit', "$PidToWait") }
+  if (Test-Path -LiteralPath (Join-Path $Stage '.kratos-update-stage')) { Remove-Item -LiteralPath $Stage -Recurse -Force }
+  if ($Relaunch -eq '1') { Start-Process -FilePath (Join-Path $Install 'kratos.exe') -ArgumentList @('--wait-for-exit', "$PidToWait") }
 } catch {
   [array]::Reverse($done)
   foreach ($n in $done) {
@@ -279,7 +279,7 @@ try {
     if (Test-Path -LiteralPath $backup) { Move-Item -LiteralPath $backup -Destination $dst -Force }
   }
   foreach ($n in $names) { Remove-Item -LiteralPath (Join-Path $Install $n[1]) -Force -ErrorAction SilentlyContinue }
-  Remove-Item -LiteralPath (Join-Path $Install '.zeron-update-pending') -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath (Join-Path $Install '.kratos-update-pending') -Force -ErrorAction SilentlyContinue
   exit 1
 } finally {
   Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue

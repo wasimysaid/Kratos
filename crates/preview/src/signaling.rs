@@ -12,7 +12,7 @@ use std::{sync::Arc, time::Duration};
 use tokio::sync::mpsc;
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
 use tokio_util::sync::CancellationToken;
-use zeron_proto::PreviewService;
+use kratos_proto::PreviewService;
 
 #[async_trait::async_trait]
 pub trait TokenSource: Send + Sync {

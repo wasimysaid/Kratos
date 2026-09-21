@@ -3,10 +3,10 @@
 #![cfg(unix)]
 
 use std::{os::unix::fs::PermissionsExt, sync::Arc, time::Duration};
-use zeron_doc::MessagePart;
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_harness::AcpHarness;
-use zeron_proto::{AgentEvent, ChatConfig, HarnessId, RunRequest, SandboxLevel, ToolCall};
+use kratos_doc::MessagePart;
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_harness::AcpHarness;
+use kratos_proto::{AgentEvent, ChatConfig, HarnessId, RunRequest, SandboxLevel, ToolCall};
 
 const CHAT: &str = "acp-large-public";
 const PEER: &str = r#"#!/usr/bin/env python3
@@ -176,7 +176,7 @@ async fn full_markdown_and_final_stderr_are_retrievable_after_restart() {
         );
         assert_eq!(&fetched, expected);
         assert_eq!(*bytes, expected.len() as u64);
-        assert!(summary.chars().count() <= zeron_doc::TOOL_OUTPUT_SUMMARY_MAX + 1);
+        assert!(summary.chars().count() <= kratos_doc::TOOL_OUTPUT_SUMMARY_MAX + 1);
         if id == "proposal" {
             assert_eq!(
                 call,

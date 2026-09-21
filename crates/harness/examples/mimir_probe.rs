@@ -3,14 +3,14 @@
 //! MIMIR_CODING_AGENT_DIR to the existing configuration directory, and
 //! MIMIR_EXECUTABLE to the installed binary. Never copy credentials into fixtures.
 //!
-//! cargo run -p zeron-harness --example mimir_probe -- <cwd> [prompt]
+//! cargo run -p kratos-harness --example mimir_probe -- <cwd> [prompt]
 //! Without a prompt this only discovers the real catalog and slash commands.
 
 use futures::StreamExt;
 use std::time::Duration;
 use tokio::sync::{mpsc, oneshot};
-use zeron_harness::{AcpHarness, CancellationToken, Harness, RunControls};
-use zeron_proto::{
+use kratos_harness::{AcpHarness, CancellationToken, Harness, RunControls};
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, ReasoningLevel, RunRequest, SandboxLevel, UserInputAnswer,
 };
 

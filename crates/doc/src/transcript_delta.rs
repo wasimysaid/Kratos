@@ -6,7 +6,7 @@
 //! fallback when a diff would approach transcript size) or the changed
 //! entries only — during streaming that is one entry per tick.
 //!
-//! Both viewports share this module (the `zeron_proto::view` rule: derivations
+//! Both viewports share this module (the `kratos_proto::view` rule: derivations
 //! that must not diverge per surface live in one place).
 
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ pub struct TranscriptUpdate {
     #[serde(flatten)]
     pub frame: TranscriptFrame,
     #[serde(default)]
-    pub context_usage: Option<zeron_proto::ContextUsage>,
+    pub context_usage: Option<kratos_proto::ContextUsage>,
 }
 
 /// One `WatchDocMessages` stream item.
@@ -435,7 +435,7 @@ mod context_update_tests {
         assert_eq!(update.context_usage, None);
         let value = serde_json::to_value(TranscriptUpdate {
             frame: TranscriptFrame::reset(&[]),
-            context_usage: Some(zeron_proto::ContextUsage {
+            context_usage: Some(kratos_proto::ContextUsage {
                 tokens: Some(0),
                 window: Some(200000),
             }),

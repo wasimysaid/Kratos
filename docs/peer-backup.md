@@ -46,11 +46,11 @@ errors are reported. These checks do not replace power-loss testing of the actua
 filesystem and storage hardware.
 
 To create and copy a fresh generation to operator-controlled storage, first
-stop Zeron on the hosted peer, then run:
+stop Kratos on the hosted peer, then run:
 
 ```sh
-ZERON_DATA_DIR=/srv/zeron zeron peer backup \
-  --output-dir /mnt/encrypted/zeron-peer-backups
+KRATOS_DATA_DIR=/srv/kratos kratos peer backup \
+  --output-dir /mnt/encrypted/kratos-peer-backups
 ```
 
 The command takes the normal exclusive engine lock and fails if an engine is
@@ -62,13 +62,13 @@ and access-controlled like the live server.
 
 ## Offline restore drill
 
-Stop every Zeron process using the source or destination. Select one complete
+Stop every Kratos process using the source or destination. Select one complete
 generation and restore it to a new data directory:
 
 ```sh
-zeron peer restore \
-  --generation /mnt/encrypted/zeron-peer-backups/<generation-uuid> \
-  --destination /srv/zeron-restored \
+kratos peer restore \
+  --generation /mnt/encrypted/kratos-peer-backups/<generation-uuid> \
+  --destination /srv/kratos-restored \
   --acknowledge-trust-rollback
 ```
 
@@ -82,7 +82,7 @@ Windows closes staging handles before its atomic no-overwrite rename. There are
 no writes after publication, so an engine starting at the destination receives
 the complete restored tree and acquires its usual instance lock. Start the peer
 normally with
-`ZERON_DATA_DIR=/srv/zeron-restored zeron headless`; its profile, trusted device
+`KRATOS_DATA_DIR=/srv/kratos-restored kratos headless`; its profile, trusted device
 identity, and Tailcat address are unchanged.
 
 ### Authorization rollback policy
@@ -104,5 +104,5 @@ A machine that also executes agents has profile-local material outside the peer
 service, including `<data-dir>/profiles/<profile-uuid>/` snapshots and journals,
 upload staging/cache, repositories/worktrees, terminal state, agent credentials,
 and settings. Back those up with the host's normal encrypted filesystem backup.
-Restore the peer generation only while Zeron is stopped, then restore the host
+Restore the peer generation only while Kratos is stopped, then restore the host
 files using the same point-in-time policy; never copy live SQLite WAL files.

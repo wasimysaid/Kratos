@@ -1,6 +1,6 @@
 //! chat2 host wiring (docs/chat2-sync.md C3): the engine-side implementations
-//! of [`zeron_sync::chat_client::ChatDocSink`] and
-//! [`zeron_sync::chat_client::CheckpointFetcher`], binding a
+//! of [`kratos_sync::chat_client::ChatDocSink`] and
+//! [`kratos_sync::chat_client::CheckpointFetcher`], binding a
 //! [`crate::doc_host::ChatDocHandle`]'s live doc to a chat2 room.
 //!
 //! The C2 rule is enforced HERE: every sink method persists doc content AND
@@ -11,9 +11,9 @@
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
-use zeron_doc::SessionDoc;
-use zeron_sync::chat_client::{ChatDocSink, CheckpointFetcher, RowImportOutcome};
-use zeron_sync::{DocsStore, SyncError};
+use kratos_doc::SessionDoc;
+use kratos_sync::chat_client::{ChatDocSink, CheckpointFetcher, RowImportOutcome};
+use kratos_sync::{DocsStore, SyncError};
 
 use crate::doc_host::EdgeConfig;
 
@@ -85,7 +85,7 @@ impl ChatDocSink for EngineChatSink {
             .map_err(|e| e.to_string())?;
         let mut updates = Vec::new();
         for (id, bytes) in pending {
-            if bytes.len() > zeron_sync::chat_client::MAX_PUSH_BYTES {
+            if bytes.len() > kratos_sync::chat_client::MAX_PUSH_BYTES {
                 self.store
                     .reject_chat_update(&self.chat_id, &id)
                     .map_err(|e| e.to_string())?;
@@ -325,7 +325,7 @@ impl EdgeChatTransport {
     }
 }
 
-impl zeron_sync::chat_client::ChatTransport for EdgeChatTransport {
+impl kratos_sync::chat_client::ChatTransport for EdgeChatTransport {
     fn fetch_rows(&self, after: u64) -> BoxFuture<'static, Result<Vec<u8>, SyncError>> {
         let http = self.http.clone();
         let edge = self.edge.clone();
@@ -410,7 +410,7 @@ mod frontier_tests {
     /// containment.
     #[test]
     fn encoded_empty_frontier_is_not_contained() {
-        let dir = std::env::temp_dir().join(format!("zeron-frontier2-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kratos-frontier2-{}", std::process::id()));
         let store = Arc::new(DocsStore::open(&dir).expect("store opens"));
         let doc = Arc::new(SessionDoc::from_doc(loro::LoroDoc::new()));
         let sink = EngineChatSink::new(&doc, store, "frontier-test-2");
@@ -424,7 +424,7 @@ mod frontier_tests {
 
     #[test]
     fn empty_frontier_is_not_contained() {
-        let dir = std::env::temp_dir().join(format!("zeron-frontier-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("kratos-frontier-test-{}", std::process::id()));
         let store = Arc::new(DocsStore::open(&dir).expect("store opens"));
         let doc = Arc::new(SessionDoc::from_doc(loro::LoroDoc::new()));
         let sink = EngineChatSink::new(&doc, store, "frontier-test");
@@ -508,7 +508,7 @@ pub(crate) fn publication_updates(doc: &loro::LoroDoc) -> Result<Vec<Vec<u8>>, S
                 peer, start, end,
             )]))
             .map_err(|e| e.to_string())?;
-        if bytes.len() <= zeron_sync::chat_client::MAX_PUSH_BYTES || end - start <= 1 {
+        if bytes.len() <= kratos_sync::chat_client::MAX_PUSH_BYTES || end - start <= 1 {
             // An indivisible oversized op remains durable until checkpointed.
             out.push(bytes);
         } else {

@@ -1,10 +1,10 @@
 //! Compact public goal state. Model-turn activity and goal completion are independent.
 use crate::theme::Theme;
 use gpui::{IntoElement, SharedString, div, prelude::*, px};
-use zeron_proto::{GoalPhase, GoalState};
+use kratos_proto::{GoalPhase, GoalState};
 
 pub(crate) fn is_control(goal_control: bool, prompt: &str) -> bool {
-    goal_control && zeron_proto::goal_control_command(prompt).is_some()
+    goal_control && kratos_proto::goal_control_command(prompt).is_some()
 }
 
 fn label(phase: GoalPhase) -> Option<&'static str> {

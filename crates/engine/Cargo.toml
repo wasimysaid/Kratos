@@ -1,18 +1,18 @@
 [package]
-name = "zeron-engine"
+name = "kratos-engine"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
-zeron-preview.workspace = true
-zeron-proto.workspace = true
-zeron-doc.workspace = true
-zeron-sync.workspace = true
-zeron-harness.workspace = true
-zeron-rpc.workspace = true
-zeron-update.workspace = true
+kratos-preview.workspace = true
+kratos-proto.workspace = true
+kratos-doc.workspace = true
+kratos-sync.workspace = true
+kratos-harness.workspace = true
+kratos-rpc.workspace = true
+kratos-update.workspace = true
 loro.workspace = true
 tokio.workspace = true
 futures.workspace = true
@@ -48,4 +48,4 @@ windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Securit
 [dev-dependencies]
 tokio-tungstenite.workspace = true
 # In-process registry server for the two-engine workspace integration tests.
-zeron-sync = { workspace = true, features = ["mock-server"] }
+kratos-sync = { workspace = true, features = ["mock-server"] }

@@ -1,6 +1,6 @@
-# Mimir in Zeron
+# Mimir in Kratos
 
-Zeron uses Mimir's native `mimir acp` stdio server, not an adapter package.
+Kratos uses Mimir's native `mimir acp` stdio server, not an adapter package.
 
 ## Setup on the run device
 
@@ -12,9 +12,9 @@ run device, never in chat, forms, executable arguments, or screenshots.
 
 Enable Mimir in **Settings → Agents**, then select it in the existing harness picker.
 Discovery checks PATH, the login shell's PATH, `~/.mimir/bin`, and `~/.local/bin`.
-If needed, set `MIMIR_EXECUTABLE=/absolute/path/to/mimir` in the Zeron run process's
+If needed, set `MIMIR_EXECUTABLE=/absolute/path/to/mimir` in the Kratos run process's
 environment and restart it. This is a binary path, not `mimir acp` or extra flags.
-Zeron supplies `acp`; model and effort selection happen through ACP configuration,
+Kratos supplies `acp`; model and effort selection happen through ACP configuration,
 not unsupported `mimir acp --model` arguments.
 
 ## What appears in the existing UI
@@ -34,10 +34,10 @@ not unsupported `mimir acp --model` arguments.
 Models are discovered from Mimir rather than a hard-coded provider catalog.
 A listed model is not proof of configured credentials. Selecting a model refreshes
 its actual effort/settings choices; unrelated models do not inherit its ladder.
-Zeron does not read Mimir's auth files or private session journals.
+Kratos does not read Mimir's auth files or private session journals.
 
 ACP forms and ordinary approval handling are not a filesystem sandbox. Mimir's
-native ACP tools do not pause for per-tool approval round trips. Zeron does not
+native ACP tools do not pause for per-tool approval round trips. Kratos does not
 advertise client-backed execution terminals or filesystem access; shell results
 arrive as public tool content, not a second terminal/stdout stream.
 
@@ -84,19 +84,19 @@ not the CLI version string, determines availability.
 Targeted checks (run from the repository root; allow up to 600 seconds each):
 
 ```sh
-cargo test -p zeron-harness --test mimir --test mimir_lifecycle --locked
-cargo test -p zeron-harness --lib acp::elicitation::tests:: --locked
-cargo test -p zeron-proto --locked
-cargo test -p zeron-engine --lib registry::tests --locked
-cargo test -p zeron-ui --lib pickers::tests --locked
-cargo build -p zeron --locked
+cargo test -p kratos-harness --test mimir --test mimir_lifecycle --locked
+cargo test -p kratos-harness --lib acp::elicitation::tests:: --locked
+cargo test -p kratos-proto --locked
+cargo test -p kratos-engine --lib registry::tests --locked
+cargo test -p kratos-ui --lib pickers::tests --locked
+cargo build -p kratos --locked
 ```
 
 The new fixtures cover model/configuration selection, public input round-trips,
 exact cancellation, stale/foreign requests, goal interaction, unchanged commands,
 and resume/load behavior. Fixtures are protocol checks, not a substitute for live runs.
 
-`cargo run -p zeron-harness --example mimir_probe -- <absolute-disposable-cwd>`
+`cargo run -p kratos-harness --example mimir_probe -- <absolute-disposable-cwd>`
 discovers real models/commands without a model prompt. Supplying its optional prompt
 starts paid/model-backed work. `mimir_forms_probe` takes `<cwd> <absolute-mimir-binary>
 [full|choices]` and uses `chatgpt/gpt-5.6-luna` at medium effort (180-second deadline).

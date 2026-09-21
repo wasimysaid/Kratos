@@ -21,9 +21,9 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use tempfile::TempDir;
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_rpc::{RpcService, memory_client, methods};
-use zeron_sync::peer::{PeerPrincipal, PeerStore, router};
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_rpc::{RpcService, memory_client, methods};
+use kratos_sync::peer::{PeerPrincipal, PeerStore, router};
 
 use peer_auth::{AuthStore, DeviceIdentity, Principal};
 
@@ -98,11 +98,11 @@ fn token(store: &AuthStore, identity: &DeviceIdentity, principal: &Principal) ->
 fn engine(dir: &TempDir, device: &str, base: &str, bearer: &str) -> EngineCore {
     std::fs::write(dir.path().join("device-id"), device).expect("device id");
     let edge =
-        zeron_engine::doc_host::EdgeConfig::with_static_token(base, bearer).with_device(device);
+        kratos_engine::doc_host::EdgeConfig::with_static_token(base, bearer).with_device(device);
     EngineCore::assemble_with_identity(
         dir.path(),
         Arc::new(HarnessRegistry::new()),
-        zeron_proto::HarnessId::Mock,
+        kratos_proto::HarnessId::Mock,
         Some(edge),
         "org-peer",
         "user-peer",
@@ -206,7 +206,7 @@ async fn authenticated_engines_converge_registry_chat_queue_and_recover() {
         .await
         .unwrap()
     {
-        zeron_engine::doc_host::BeginQueueEditOutcome::Acquired {
+        kratos_engine::doc_host::BeginQueueEditOutcome::Acquired {
             lease_id,
             base_text_hash,
             ..
@@ -218,7 +218,7 @@ async fn authenticated_engines_converge_registry_chat_queue_and_recover() {
             .renew_queued_message_edit("chat-1", &queued_id, &lease.0)
             .await
             .unwrap(),
-        zeron_engine::doc_host::RenewQueueEditOutcome::Renewed { .. }
+        kratos_engine::doc_host::RenewQueueEditOutcome::Renewed { .. }
     ));
     assert!(matches!(
         a.doc_host
@@ -226,13 +226,13 @@ async fn authenticated_engines_converge_registry_chat_queue_and_recover() {
                 "chat-1",
                 &queued_id,
                 &lease.0,
-                zeron_engine::doc_host::FinishQueueEditAction::Commit,
+                kratos_engine::doc_host::FinishQueueEditAction::Commit,
                 Some("edited on host"),
                 Some(&lease.1)
             )
             .await
             .unwrap(),
-        zeron_engine::doc_host::FinishQueueEditOutcome::Committed
+        kratos_engine::doc_host::FinishQueueEditOutcome::Committed
     ));
     wait_for(|| {
         viewer_chat
@@ -296,7 +296,7 @@ async fn authenticated_engines_converge_registry_chat_queue_and_recover() {
     // Peer management and local identity are forbidden through the remote
     // wrapper even though ordinary queue/registry methods are forwardable.
     let remote = memory_client(
-        Arc::new(zeron_engine::rpc::RemoteEngineRpc(reopened.rpc_service())) as Arc<dyn RpcService>,
+        Arc::new(kratos_engine::rpc::RemoteEngineRpc(reopened.rpc_service())) as Arc<dyn RpcService>,
     );
     assert!(
         remote

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Kratos
+GenericName=Coding Agent Controller
+Comment=Multi-device controller for coding agents
+Exec=kratos %u
+TryExec=kratos
+Icon=kratos
+Terminal=false
+Categories=Development;Utility;
+Keywords=agent;claude;codex;ai;coding;
+StartupWMClass=kratos
+MimeType=x-scheme-handler/kratos;

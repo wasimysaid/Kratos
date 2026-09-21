@@ -1,7 +1,7 @@
 //! SessionsEngine — per-chat agent runs: dispatch, steering, interrupts, input bridging,
 //! journal + broadcast fan-out, and 120ms coalesced doc streaming.
 //!
-//! Pragmatic port of zeron's `sessions.ts` (spec: feature-inventory §3.2):
+//! Pragmatic port of kratos's `sessions.ts` (spec: feature-inventory §3.2):
 //! - every `AgentEvent` is (a) appended to the on-disk run journal, (b) broadcast to
 //!   in-process subscribers, (c) folded via `fold_event_into_parts` and diffed into the
 //!   chat's `SessionDoc` through `SegmentWriter` on a coalesced `STREAM_COMMIT_MS` timer;
@@ -10,7 +10,7 @@
 //! - a `Steered` event splits the assistant entry at the exact boundary;
 //! - recovery (interrupt or a stale journal at boot) stamps the streaming entry `aborted`.
 //!
-//! Scope notes: sessions are keyed by chat id (one live run per chat). Zeron's pulse
+//! Scope notes: sessions are keyed by chat id (one live run per chat). Kratos's pulse
 //! loop is ported as the 15s liveness heartbeat in `drive_run`; its stall watchdog is
 //! deliberately NOT ported (rejected in review — agents may legitimately wait on
 //! something for far longer than any timeout, and a live child IS the working signal).
@@ -24,12 +24,12 @@ use chrono::Utc;
 use futures::StreamExt;
 use tokio::sync::{broadcast, mpsc, oneshot, watch};
 
-use zeron_doc::{
+use kratos_doc::{
     DocError, MessagePart, MessageRole, MessageStatus, STREAM_COMMIT_MS, SegmentWriter, SessionDoc,
     SessionMessageEntry, fold_event_into_parts, sanitize_tool_call,
 };
-use zeron_harness::{CancellationToken, Harness, RunControls, SteerMessage};
-use zeron_proto::{
+use kratos_harness::{CancellationToken, Harness, RunControls, SteerMessage};
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, RunRequest, Session, SessionStatus, UserInputAnswer,
     UserInputQuestion,
 };
@@ -59,7 +59,7 @@ type PendingInputs = Arc<Mutex<HashMap<String, oneshot::Sender<Vec<UserInputAnsw
 
 /// A harness-native session id plus the cwd it was created under. Harness
 /// session stores are cwd-scoped (claude keys conversations by project
-/// directory — zeron sessions.ts:563 "harness session stores are keyed by
+/// directory — kratos sessions.ts:563 "harness session stores are keyed by
 /// cwd"), so resume is only injected for runs launched from the same cwd.
 #[derive(Debug, Clone)]
 struct HarnessSessionRef {
@@ -75,12 +75,12 @@ struct HarnessSessionRef {
 struct RuntimeConfig {
     harness_id: HarnessId,
     model: Option<String>,
-    reasoning: Option<zeron_proto::ReasoningLevel>,
+    reasoning: Option<kratos_proto::ReasoningLevel>,
     model_options: serde_json::Map<String, serde_json::Value>,
     cwd: String,
-    sandbox: zeron_proto::SandboxLevel,
+    sandbox: kratos_proto::SandboxLevel,
     auto_approve: bool,
-    worktree: Option<zeron_proto::WorktreeSpec>,
+    worktree: Option<kratos_proto::WorktreeSpec>,
 }
 
 impl RuntimeConfig {
@@ -151,7 +151,7 @@ struct Inner {
     last_requests: Mutex<HashMap<String, RunRequest>>,
     /// Harness-native session ids per chat (resume continuity across turns) —
     /// the live-process cache over the durable copy on the workspace chat row
-    /// (zeron kept the same pair on `chats.harness_session_id`). An empty
+    /// (kratos kept the same pair on `chats.harness_session_id`). An empty
     /// session id is the "do not resume" tombstone after a rejected resume.
     harness_sessions: Mutex<HashMap<String, HarnessSessionRef>>,
     /// Auto-titler for untitled chats (wired at engine assembly; absent in bare tests).
@@ -389,7 +389,7 @@ impl SessionsEngine {
     ///
     /// - The user message entry is written to the doc immediately (id = `message_id`).
     /// - A live steerable run receives the prompt as its next turn via the mailbox
-    ///   (zeron's persistent-session routing); otherwise any live run is interrupted
+    ///   (kratos's persistent-session routing); otherwise any live run is interrupted
     ///   first — never two runtimes driving one chat.
     pub async fn dispatch(
         &self,
@@ -511,7 +511,7 @@ impl SessionsEngine {
         let user_id = message_id.unwrap_or_else(new_id);
         handle.write_user_message(&user_id, &request.prompt, now_ms())?;
 
-        // Engine-owned resume (zeron sessions.ts:736 — every dispatch read the
+        // Engine-owned resume (kratos sessions.ts:736 — every dispatch read the
         // chat's stored harness session): callers always send `resume: None`;
         // the engine threads the chat's prior harness session back in so a new
         // process (app restart) continues the same harness conversation. The
@@ -637,7 +637,7 @@ impl SessionsEngine {
     /// Negotiated native human controls travel through the bounded mailbox,
     /// not the pending model-message queue, and do not start another parent turn.
     pub fn is_control_prompt(&self, chat_id: &str, prompt: &str) -> bool {
-        zeron_proto::goal_control_command(prompt).is_some()
+        kratos_proto::goal_control_command(prompt).is_some()
             && lock(&self.inner.runs)
                 .get(chat_id)
                 .is_some_and(|run| run.goal_control)
@@ -729,7 +729,7 @@ impl SessionsEngine {
         let Some((run_id, token, cancel, pending)) = target else {
             return Ok(false);
         };
-        // Unpark any blocked question FIRST (mirrors zeron: harness teardown can await a
+        // Unpark any blocked question FIRST (mirrors kratos: harness teardown can await a
         // parked question callback — a run stuck on a question would deadlock the stop).
         let parked: Vec<_> = lock(&pending).drain().map(|(_, tx)| tx).collect();
         for tx in parked {
@@ -779,7 +779,7 @@ impl SessionsEngine {
     /// with a VISIBLE "Run interrupted by engine restart" error part, close the
     /// journal with a synthetic `Done{interrupted}` — and then PICK THE RUN BACK
     /// UP: a fresh crashed turn with revival budget left is re-dispatched against
-    /// the remembered harness session (zeron: "not just eulogized";
+    /// the remembered harness session (kratos: "not just eulogized";
     /// `MAX_AUTO_RESUME` = 3 consecutive revivals, fresh = crashed < 12h ago).
     pub fn recover_stale(&self) -> Result<usize, EngineError> {
         const MAX_AUTO_RESUME: u32 = 3;
@@ -800,7 +800,7 @@ impl SessionsEngine {
             // Harness continuity first: the crashed run's session id may only
             // exist in the journal (the debounced workspace-row write may
             // never have landed) — remember it so the revived run resumes the
-            // same harness conversation (zeron recoverDraft, sessions.ts:538).
+            // same harness conversation (kratos recoverDraft, sessions.ts:538).
             if let Some((session_id, cwd)) = self.inner.journal_harness_session(&chat_id) {
                 self.inner
                     .remember_harness_session(&chat_id, &session_id, &cwd);
@@ -865,7 +865,7 @@ impl SessionsEngine {
                 let request = sessions
                     .last_request(&chat_id)
                     .or_else(|| host.request_from_chat_row(&chat_id, &prompt_text))
-                    // Last resort: the journal's own cwd (zeron's draft config)
+                    // Last resort: the journal's own cwd (kratos's draft config)
                     // — a crash can predate the debounced workspace-row write.
                     .or_else(|| {
                         let (_, cwd) = sessions.inner.journal_harness_session(&chat_id)?;
@@ -876,7 +876,7 @@ impl SessionsEngine {
                             reasoning: None,
                             model_options: Default::default(),
                             cwd,
-                            sandbox: zeron_proto::SandboxLevel::WorkspaceWrite,
+                            sandbox: kratos_proto::SandboxLevel::WorkspaceWrite,
                             auto_approve: false,
                             attachments: Vec::new(),
                             resume: None,
@@ -1161,7 +1161,7 @@ impl Inner {
 
     /// Record the chat's harness-native session id (and its cwd): live-process
     /// cache plus the durable workspace chat row — the row is what survives an
-    /// engine restart (zeron sessions.ts:1039).
+    /// engine restart (kratos sessions.ts:1039).
     fn remember_harness_session(&self, chat_id: &str, session_id: &str, cwd: &str) {
         if session_id.is_empty() {
             return;
@@ -1186,7 +1186,7 @@ impl Inner {
     // yields a fresh session whose SessionStarted overwrites the row.
 
     /// The session id to resume for a run in `chat_id` launching from `cwd`
-    /// (zeron sessions.ts:736, looked up on every dispatch):
+    /// (kratos sessions.ts:736, looked up on every dispatch):
     /// live-process cache → workspace chat row → journal scan (the crash path
     /// where the debounced row write never landed — SessionStarted/Done events
     /// are journaled per event, flushed immediately). Cwd-gated throughout:
@@ -1426,7 +1426,7 @@ impl SubagentSink {
         if let Err(err) = finished {
             tracing::warn!(doc = %self.doc_id, error = %err, "subagent sink finish failed");
         }
-        let entries = zeron_doc::join_continuation_entries(self.doc.read_entries().ok()?);
+        let entries = kratos_doc::join_continuation_entries(self.doc.read_entries().ok()?);
         serde_json::to_string(&entries).ok()
     }
 }
@@ -1523,7 +1523,7 @@ fn sync_segment<'a>(
     Ok(())
 }
 
-fn link_child_part(part: &mut MessagePart, child: &zeron_proto::AgentChild, doc: Option<&str>) {
+fn link_child_part(part: &mut MessagePart, child: &kratos_proto::AgentChild, doc: Option<&str>) {
     if let MessagePart::Tool {
         id,
         call,
@@ -1533,7 +1533,7 @@ fn link_child_part(part: &mut MessagePart, child: &zeron_proto::AgentChild, doc:
     } = part
         && child.tool_call_id.as_ref() == Some(id)
     {
-        *call = zeron_proto::ToolCall::Unknown {
+        *call = kratos_proto::ToolCall::Unknown {
             name: format!("Agent: {}", child.title),
             input: None,
         };
@@ -1541,16 +1541,16 @@ fn link_child_part(part: &mut MessagePart, child: &zeron_proto::AgentChild, doc:
             *subagent_ref = Some(doc.into());
         }
         *subagent_status = Some(match child.status.as_str() {
-            "running" | "queued" => zeron_doc::SubagentStatus::Running,
-            "completed" => zeron_doc::SubagentStatus::Done,
-            _ => zeron_doc::SubagentStatus::Failed,
+            "running" | "queued" => kratos_doc::SubagentStatus::Running,
+            "completed" => kratos_doc::SubagentStatus::Done,
+            _ => kratos_doc::SubagentStatus::Failed,
         });
     }
 }
 
 fn public_child_entry(
-    snapshot: &zeron_proto::ChildTranscript,
-    child: &zeron_proto::AgentChild,
+    snapshot: &kratos_proto::ChildTranscript,
+    child: &kratos_proto::AgentChild,
     doc_id: &str,
     device_id: &str,
 ) -> SessionMessageEntry {
@@ -1567,7 +1567,7 @@ fn public_child_entry(
             ),
         });
     }
-    zeron_doc::apply_sidecar_refs(doc_id, &mut parts);
+    kratos_doc::apply_sidecar_refs(doc_id, &mut parts);
     SessionMessageEntry {
         id: "public-child".into(),
         role: MessageRole::Assistant,
@@ -1655,7 +1655,7 @@ impl AgentToolOwners {
             *output_ref = None;
         }
         fold_event_into_parts(&mut parts, event);
-        zeron_doc::apply_sidecar_refs(chat_id, &mut parts);
+        kratos_doc::apply_sidecar_refs(chat_id, &mut parts);
         let updated = render_parts(&parts).remove(0);
         if !doc.update_agent_tool_part(container, &updated)? {
             return Ok(false);
@@ -1820,7 +1820,7 @@ async fn drive_run(
     // segment — the mid-word transcript splits.
     let mut seen_tools: std::collections::HashSet<String> = std::collections::HashSet::new();
     let mut agent_tools = AgentToolOwners::default();
-    let mut native_links: HashMap<String, (zeron_proto::AgentChild, Option<String>)> =
+    let mut native_links: HashMap<String, (kratos_proto::AgentChild, Option<String>)> =
         HashMap::new();
     let mut seen_images = std::collections::HashSet::new();
     for entry in doc_ref.read_entries().unwrap_or_default() {
@@ -1856,12 +1856,12 @@ async fn drive_run(
     // so the gate still catches real crashes. touch_session throttles at 10s.
     let mut live_heartbeat = tokio::time::interval(std::time::Duration::from_secs(15));
     live_heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
-    // PERSISTENT SESSION (zeron runsBySession): a completed turn on a
+    // PERSISTENT SESSION (kratos runsBySession): a completed turn on a
     // steerable harness parks here instead of ending the run — the child and
     // its steering mailbox stay warm, and the next user message (dispatch
     // routes into a live run) starts the next turn with zero respawn/resume
     // latency. `Some(when)` = idle since then; the 30-min reaper below ends
-    // a session nobody comes back to (zeron SESSION_IDLE_MS).
+    // a session nobody comes back to (kratos SESSION_IDLE_MS).
     const SESSION_IDLE: std::time::Duration = std::time::Duration::from_secs(30 * 60);
     let mut idle_since: Option<tokio::time::Instant> = None;
     let steerable = harness.supports_steering();
@@ -1876,7 +1876,7 @@ async fn drive_run(
     // segment finalized Complete, status Idle, child and mailbox warm. A
     // false trip (the agent was quietly waiting on something invisible)
     // costs a status dip: the parked-resume path below re-arms Working the
-    // moment output flows again, and nothing is lost. `ZERON_TURN_QUIESCE_MS`
+    // moment output flows again, and nothing is lost. `KRATOS_TURN_QUIESCE_MS`
     // overrides the window; 0 disables.
     // RETIRED for native drivers: a harness whose every turn shape ends with
     // a deterministic wire Done (claude/codex/cursor native) needs no
@@ -1886,7 +1886,7 @@ async fn drive_run(
     // ACP retains the watchdog only for unowned self-continued activity.
     let deterministic_turn_end = harness.deterministic_turn_end();
     let authoritative_prompt_end = harness.authoritative_prompt_end();
-    let quiesce_after: Option<std::time::Duration> = match std::env::var("ZERON_TURN_QUIESCE_MS")
+    let quiesce_after: Option<std::time::Duration> = match std::env::var("KRATOS_TURN_QUIESCE_MS")
         .ok()
         .and_then(|v| v.parse::<u64>().ok())
     {
@@ -1905,11 +1905,11 @@ async fn drive_run(
     // so the default 120s window read as 2min of stuck-Working after every
     // background notification (user report 2026-08-13). The in-flight
     // fold gate below still protects running tools; reasoning heartbeats
-    // push the window during real thinking. `ZERON_SELF_TURN_QUIESCE_MS`
+    // push the window during real thinking. `KRATOS_SELF_TURN_QUIESCE_MS`
     // overrides; 0 falls back to the normal window. An explicit
-    // `ZERON_TURN_QUIESCE_MS=0` still disables the watchdog entirely.
+    // `KRATOS_TURN_QUIESCE_MS=0` still disables the watchdog entirely.
     let self_quiesce_after: Option<std::time::Duration> =
-        match std::env::var("ZERON_SELF_TURN_QUIESCE_MS")
+        match std::env::var("KRATOS_SELF_TURN_QUIESCE_MS")
             .ok()
             .and_then(|v| v.parse::<u64>().ok())
         {
@@ -1955,7 +1955,7 @@ async fn drive_run(
                     inner.touch_session(&chat_id);
                     continue;
                 }
-                // Idle reaper (zeron SESSION_IDLE_MS): a parked persistent session
+                // Idle reaper (kratos SESSION_IDLE_MS): a parked persistent session
                 // nobody returned to in 30 minutes releases its child. The turn
                 // was finalized at Done, so this end is clean — no aborted stamp.
                 _ = tokio::time::sleep_until(
@@ -2043,7 +2043,7 @@ async fn drive_run(
                     && steerable
                     && !folded.iter().any(|p| match p {
                         MessagePart::Tool { id, resolved: false, .. } => {
-                            id != zeron_proto::LIVE_PLAN_TOOL_ID
+                            id != kratos_proto::LIVE_PLAN_TOOL_ID
                         }
                         MessagePart::Input { resolved: false, .. } => true,
                         _ => false,
@@ -2159,11 +2159,11 @@ async fn drive_run(
                 let _ = doc_ref.set_message_status(&accepted.message_id, MessageStatus::Aborted);
                 if let Ok(commands) = doc_ref.read_commands() {
                     for command in commands {
-                        if matches!(&command.payload, zeron_doc::SessionCommandPayload::Steer { message_id: Some(id), .. } if id == &accepted.message_id)
+                        if matches!(&command.payload, kratos_doc::SessionCommandPayload::Steer { message_id: Some(id), .. } if id == &accepted.message_id)
                         {
                             let _ = doc_ref.set_command_status(
                                 &command.id,
-                                zeron_doc::SessionCommandStatus::Rejected,
+                                kratos_doc::SessionCommandStatus::Rejected,
                                 Some(error),
                             );
                         }
@@ -2220,14 +2220,14 @@ async fn drive_run(
                                         {
                                             continue;
                                         }
-                                        if let Some(payload) = zeron_doc::sidecar_payload(event) {
+                                        if let Some(payload) = kratos_doc::sidecar_payload(event) {
                                             host.upload_tool_sidecar(&sub_id, payload);
                                         }
                                     }
                                     if !matches!(child.status.as_str(), "running" | "queued") {
                                         host.upload_tool_sidecar(
                                             &chat_id,
-                                            zeron_doc::SidecarPayload {
+                                            kratos_doc::SidecarPayload {
                                                 part_id: sub_id.clone(),
                                                 output: handle.doc().read_entries().ok().and_then(
                                                     |entries| serde_json::to_string(&entries).ok(),
@@ -2338,7 +2338,7 @@ async fn drive_run(
                         }
                     }
                 }
-                zeron_doc::fold_event_into_parts(&mut folded, &event);
+                kratos_doc::fold_event_into_parts(&mut folded, &event);
                 if !dirty {
                     dirty = true;
                     flush_at = tokio::time::Instant::now()
@@ -2389,7 +2389,7 @@ async fn drive_run(
                     sink.push_user(&device_id, text);
                     continue;
                 }
-                zeron_doc::fold_event_into_parts(&mut sink.folded, sub_event);
+                kratos_doc::fold_event_into_parts(&mut sink.folded, sub_event);
                 sink.dirty = true;
                 if !chip_streaming && done {
                     // In-place chip refresh on lifecycle transitions only —
@@ -2425,7 +2425,7 @@ async fn drive_run(
                     {
                         host.upload_tool_sidecar(
                             &chat_id,
-                            zeron_doc::SidecarPayload {
+                            kratos_doc::SidecarPayload {
                                 part_id: doc_id,
                                 output: Some(json),
                                 diff: None,
@@ -2490,7 +2490,7 @@ async fn drive_run(
                             config
                                 .model_options
                                 .insert(id.clone(), value.clone().into());
-                            zeron_proto::ChatConfig {
+                            kratos_proto::ChatConfig {
                                 harness: config.harness_id,
                                 model: config.model.clone(),
                                 reasoning: config.reasoning,
@@ -2577,7 +2577,7 @@ async fn drive_run(
                 ) || matches!(
                     &event,
                     AgentEvent::ToolCall { id, .. }
-                        if id == zeron_proto::LIVE_PLAN_TOOL_ID || !seen_tools.contains(id)
+                        if id == kratos_proto::LIVE_PLAN_TOOL_ID || !seen_tools.contains(id)
                 ));
             if self_continued {
                 tracing::info!(
@@ -2646,8 +2646,8 @@ async fn drive_run(
             // treating its reappearance after a park/steer reset as a stale
             // echo dropped the todo list for the rest of the run — from the
             // first boundary on, plans never rendered again.
-            AgentEvent::ToolCall { id, .. } if id == zeron_proto::LIVE_PLAN_TOOL_ID => {}
-            AgentEvent::ToolResult { id, .. } if id == zeron_proto::LIVE_PLAN_TOOL_ID => {}
+            AgentEvent::ToolCall { id, .. } if id == kratos_proto::LIVE_PLAN_TOOL_ID => {}
+            AgentEvent::ToolResult { id, .. } if id == kratos_proto::LIVE_PLAN_TOOL_ID => {}
             AgentEvent::ToolCall { id, .. } => {
                 if !in_segment(&folded, id) && seen_tools.contains(id) {
                     continue;
@@ -2796,7 +2796,7 @@ async fn drive_run(
 
         inner.publish(&chat_id, &event);
 
-        // Defensive rule from zeron: a mid-run SessionStarted re-emission (Claude SDK
+        // Defensive rule from kratos: a mid-run SessionStarted re-emission (Claude SDK
         // background re-invocations) must not wipe the segment being written.
         let skip_fold = matches!(&event, AgentEvent::SessionStarted { .. }) && !folded.is_empty();
         if !skip_fold {
@@ -2811,8 +2811,8 @@ async fn drive_run(
             // Full public outputs use the existing lazy details path; only
             // bounded summaries/diff stats ride the synced transcript. Upload
             // on resolution, never per progress delta (avoids stale PUT races).
-            zeron_doc::apply_sidecar_refs(&chat_id, &mut folded);
-            if let Some(payload) = zeron_doc::sidecar_payload(&event)
+            kratos_doc::apply_sidecar_refs(&chat_id, &mut folded);
+            if let Some(payload) = kratos_doc::sidecar_payload(&event)
                 && let Some(host) = inner.doc_host()
             {
                 host.upload_tool_sidecar(&chat_id, payload);
@@ -2936,7 +2936,7 @@ async fn drive_run(
         {
             host.upload_tool_sidecar(
                 &chat_id,
-                zeron_doc::SidecarPayload {
+                kratos_doc::SidecarPayload {
                     part_id: doc_id,
                     output: Some(json),
                     diff: None,
@@ -3004,12 +3004,12 @@ async fn drive_run(
 #[cfg(test)]
 mod tests {
     use super::{RuntimeConfig, public_child_entry, subagent_doc_id};
-    use zeron_proto::{HarnessId, RunRequest, SandboxLevel};
+    use kratos_proto::{HarnessId, RunRequest, SandboxLevel};
 
     #[test]
     fn public_child_fold_persists_full_output_identity_across_replacement() {
-        use zeron_doc::{MessagePart, SessionDoc};
-        use zeron_proto::{AgentChild, AgentEvent, ChildTranscript, ToolCall};
+        use kratos_doc::{MessagePart, SessionDoc};
+        use kratos_proto::{AgentChild, AgentEvent, ChildTranscript, ToolCall};
 
         let child = AgentChild {
             child_id: "child".into(),
@@ -3041,7 +3041,7 @@ mod tests {
         let new_snapshot = snapshot("r2", "NEW");
         let old = public_child_entry(&old_snapshot, &child, "child-doc", "device");
         let new = public_child_entry(&new_snapshot, &child, "child-doc", "device");
-        let identity = |entry: &zeron_doc::SessionMessageEntry| match &entry.parts[0] {
+        let identity = |entry: &kratos_doc::SessionMessageEntry| match &entry.parts[0] {
             MessagePart::Tool {
                 output,
                 output_ref,
@@ -3111,7 +3111,7 @@ mod tests {
             &mut parts,
             &AgentEvent::ToolCall {
                 id: "i".into(),
-                call: zeron_proto::ToolCall::Unknown {
+                call: kratos_proto::ToolCall::Unknown {
                     name: "Generate image".into(),
                     input: None,
                 },
@@ -3149,7 +3149,7 @@ mod tests {
             prompt: "first".into(),
             harness: None,
             model: Some("grok-4.6".into()),
-            reasoning: Some(zeron_proto::ReasoningLevel::High),
+            reasoning: Some(kratos_proto::ReasoningLevel::High),
             model_options: serde_json::Map::new(),
             cwd: "/tmp".into(),
             sandbox: SandboxLevel::WorkspaceWrite,
@@ -3174,7 +3174,7 @@ mod tests {
         assert!(!config.can_route(HarnessId::Grok, &follow_up));
         follow_up.model = initial.model.clone();
 
-        follow_up.reasoning = Some(zeron_proto::ReasoningLevel::Medium);
+        follow_up.reasoning = Some(kratos_proto::ReasoningLevel::Medium);
         assert!(!config.can_route(HarnessId::Grok, &follow_up));
         follow_up.reasoning = initial.reasoning;
 
@@ -3215,7 +3215,7 @@ mod tests {
 
     #[test]
     fn canonical_background_journal_tail_never_hides_a_new_parent_turn() {
-        use zeron_proto::{AgentEvent, DoneStatus, ToolCall};
+        use kratos_proto::{AgentEvent, DoneStatus, ToolCall};
         let call = |id: &str, agent: bool| AgentEvent::ToolCall {
             id: id.into(),
             call: ToolCall::Unknown {
@@ -3289,13 +3289,13 @@ mod tests {
 
     #[test]
     fn canonical_owner_cache_is_bounded_and_prefers_active_children() {
-        use zeron_doc::{MessagePart, SegmentWriter, SessionDoc};
-        use zeron_proto::{AgentEvent, ToolCall};
+        use kratos_doc::{MessagePart, SegmentWriter, SessionDoc};
+        use kratos_proto::{AgentEvent, ToolCall};
         let doc = SessionDoc::init("bounded").unwrap();
         let mut parts = Vec::new();
         for i in 0..super::AGENT_TOOL_OWNER_LIMIT + 8 {
             let id = format!("child-{i}");
-            zeron_doc::fold_event_into_parts(
+            kratos_doc::fold_event_into_parts(
                 &mut parts,
                 &AgentEvent::ToolCall {
                     id: id.clone(),
@@ -3306,7 +3306,7 @@ mod tests {
                 },
             );
             if i != 0 {
-                zeron_doc::fold_event_into_parts(
+                kratos_doc::fold_event_into_parts(
                     &mut parts,
                     &AgentEvent::ToolResult {
                         id,

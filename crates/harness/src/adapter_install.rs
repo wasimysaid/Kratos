@@ -6,7 +6,7 @@
 //! before the adapter ever ran — silently, with an errno-encoded exit code
 //! (254 = ENOENT, the zeronsh/comet#95 crash) that surfaced as an opaque
 //! "harness protocol error". Instead, pinned adapter packages are installed
-//! ONCE into a zeron-owned prefix (`~/.zeron/adapters/<pkg>/<version>` on
+//! ONCE into a kratos-owned prefix (`~/.kratos/adapters/<pkg>/<version>` on
 //! Unix, the local app-data directory on Windows), with its own npm cache
 //! beside it, so a root-owned or read-only user cache cannot break us. Every
 //! subsequent launch spawns `node <entry>` directly — no npm anywhere near a
@@ -59,13 +59,13 @@ impl NpmPin {
     }
 }
 
-const OK_MARKER: &str = ".zeron-install-ok";
+const OK_MARKER: &str = ".kratos-install-ok";
 const INSTALL_TIMEOUT: Duration = Duration::from_secs(600);
 
-/// Managed adapter storage. `$ZERON_ADAPTERS_DIR` wins, followed by
-/// `$ZERON_DATA_DIR/adapters`. Windows defaults to
-/// `%LOCALAPPDATA%/Zeron/adapters` (or `%USERPROFILE%/AppData/Local/...`);
-/// Unix keeps `~/.zeron/adapters`.
+/// Managed adapter storage. `$KRATOS_ADAPTERS_DIR` wins, followed by
+/// `$KRATOS_DATA_DIR/adapters`. Windows defaults to
+/// `%LOCALAPPDATA%/Kratos/adapters` (or `%USERPROFILE%/AppData/Local/...`);
+/// Unix keeps `~/.kratos/adapters`.
 fn adapters_root() -> Option<PathBuf> {
     adapters_root_with(
         &|key| std::env::var_os(key),
@@ -82,25 +82,25 @@ fn adapters_root_with(
             .filter(|value| !value.is_empty())
             .map(PathBuf::from)
     };
-    if let Some(dir) = value("ZERON_ADAPTERS_DIR") {
+    if let Some(dir) = value("KRATOS_ADAPTERS_DIR") {
         return Some(dir);
     }
-    if let Some(dir) = value("ZERON_DATA_DIR") {
+    if let Some(dir) = value("KRATOS_DATA_DIR") {
         return Some(dir.join("adapters"));
     }
     if platform == crate::executable::Platform::Windows {
         value("LOCALAPPDATA")
-            .map(|dir| dir.join("Zeron").join("adapters"))
+            .map(|dir| dir.join("Kratos").join("adapters"))
             .or_else(|| {
                 value("USERPROFILE").map(|home| {
                     home.join("AppData")
                         .join("Local")
-                        .join("Zeron")
+                        .join("Kratos")
                         .join("adapters")
                 })
             })
     } else {
-        value("HOME").map(|home| home.join(".zeron").join("adapters"))
+        value("HOME").map(|home| home.join(".kratos").join("adapters"))
     }
 }
 
@@ -372,7 +372,7 @@ pub(crate) async fn ensure_installed(
     })
 }
 
-/// A zeron-owned shim script materialized INSIDE a managed install dir, for
+/// A kratos-owned shim script materialized INSIDE a managed install dir, for
 /// SDK packages with no bin entry (`@cursor/sdk`): the shim resolves the SDK
 /// from the sibling `node_modules`. Returns the shim path when the install is
 /// complete AND the shim contents match this build (a comet upgrade that
@@ -393,7 +393,7 @@ pub(crate) fn installed_shim(pin: &NpmPin, shim_name: &str, contents: &str) -> O
 }
 
 /// Like [`ensure_installed`], for a package consumed as a LIBRARY by a
-/// zeron-owned shim rather than through a bin entry. Installs the pin once,
+/// kratos-owned shim rather than through a bin entry. Installs the pin once,
 /// writes `contents` as `<install-dir>/<shim_name>`, and returns the shim
 /// path (spawn it via [`launch_for_entry`]).
 pub(crate) async fn ensure_installed_shim(
@@ -506,7 +506,7 @@ async fn install_into(
     // A bare manifest keeps npm from walking up into a user project.
     std::fs::write(tmp_dir.join("package.json"), "{\"private\":true}\n")?;
     tracing::info!(
-        target: "zeron_harness::adapter_install",
+        target: "kratos_harness::adapter_install",
         package = %pin.spec(),
         dir = %tmp_dir.display(),
         "installing ACP adapter"
@@ -676,15 +676,15 @@ mod tests {
 
     #[test]
     fn adapters_root_has_injected_windows_precedence_and_fallbacks() {
-        let explicit = PathBuf::from(r"D:\Zeron adapters");
-        let data = PathBuf::from(r"E:\Zeron data");
+        let explicit = PathBuf::from(r"D:\Kratos adapters");
+        let data = PathBuf::from(r"E:\Kratos data");
         let local = PathBuf::from(r"C:\Users\Ada\AppData\Local");
         let profile = PathBuf::from(r"C:\Users\Ada");
         assert_eq!(
             adapters_root_with(
                 &env(&[
-                    ("ZERON_ADAPTERS_DIR", explicit.clone().into_os_string()),
-                    ("ZERON_DATA_DIR", data.clone().into_os_string()),
+                    ("KRATOS_ADAPTERS_DIR", explicit.clone().into_os_string()),
+                    ("KRATOS_DATA_DIR", data.clone().into_os_string()),
                     ("LOCALAPPDATA", local.clone().into_os_string()),
                 ]),
                 crate::executable::Platform::Windows,
@@ -693,7 +693,7 @@ mod tests {
         );
         assert_eq!(
             adapters_root_with(
-                &env(&[("ZERON_DATA_DIR", data.clone().into_os_string())]),
+                &env(&[("KRATOS_DATA_DIR", data.clone().into_os_string())]),
                 crate::executable::Platform::Windows,
             ),
             Some(data.join("adapters"))
@@ -703,7 +703,7 @@ mod tests {
                 &env(&[("LOCALAPPDATA", local.clone().into_os_string())]),
                 crate::executable::Platform::Windows,
             ),
-            Some(local.join("Zeron").join("adapters"))
+            Some(local.join("Kratos").join("adapters"))
         );
         assert_eq!(
             adapters_root_with(
@@ -714,7 +714,7 @@ mod tests {
                 profile
                     .join("AppData")
                     .join("Local")
-                    .join("Zeron")
+                    .join("Kratos")
                     .join("adapters")
             )
         );

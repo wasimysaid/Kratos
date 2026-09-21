@@ -9,8 +9,8 @@ use std::{path::PathBuf, time::Duration};
 
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot};
-use zeron_harness::{AcpHarness, CancellationToken, Harness, RunControls};
-use zeron_proto::{
+use kratos_harness::{AcpHarness, CancellationToken, Harness, RunControls};
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, ReasoningLevel, RunRequest, SandboxLevel, UserInputAnswer,
     UserInputQuestion,
 };

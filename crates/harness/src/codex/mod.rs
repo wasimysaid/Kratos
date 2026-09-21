@@ -52,7 +52,7 @@ use serde_json::{Value, json};
 use tokio::io::AsyncBufReadExt;
 use tokio::sync::mpsc;
 
-use zeron_proto::{
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, Model, ModelOption, ModelOptionChoice, ReasoningLevel,
     RunRequest, SlashCommand, SteeringMode, UserInputAnswer, UserInputQuestion,
 };
@@ -198,8 +198,8 @@ impl CodexHarness {
                     "initialize",
                     json!({
                         "clientInfo": {
-                            "name": "zeron-native",
-                            "title": "Zeron",
+                            "name": "kratos-native",
+                            "title": "Kratos",
                             "version": env!("CARGO_PKG_VERSION"),
                         },
                         "capabilities": { "experimentalApi": true },
@@ -249,8 +249,8 @@ impl CodexHarness {
                     "initialize",
                     json!({
                         "clientInfo": {
-                            "name": "zeron-native",
-                            "title": "Zeron",
+                            "name": "kratos-native",
+                            "title": "Kratos",
                             "version": env!("CARGO_PKG_VERSION"),
                         },
                         "capabilities": { "experimentalApi": true },
@@ -321,7 +321,7 @@ fn reasoning_level(value: &str) -> Option<ReasoningLevel> {
     })
 }
 
-/// Codex accepts both names, but Zeron has historically persisted `fast`.
+/// Codex accepts both names, but Kratos has historically persisted `fast`.
 /// Normalize the app server's `priority` id so live and fallback catalogs do
 /// not produce two different settings for the same tier.
 fn normalized_service_tier(value: &str) -> &str {
@@ -557,7 +557,7 @@ impl Harness for CodexHarness {
             Ok(_) => Ok(static_models()),
             Err(error) => {
                 tracing::debug!(
-                    target: "zeron_harness::codex",
+                    target: "kratos_harness::codex",
                     "model/list discovery failed; using fallback catalog: {error}"
                 );
                 Ok(static_models())
@@ -612,9 +612,9 @@ impl CodexHarness {
         // worktree on a slash-named branch derives a malformed mount that
         // kills every command.
         request.sandbox = if title_only {
-            zeron_proto::SandboxLevel::ReadOnly
+            kratos_proto::SandboxLevel::ReadOnly
         } else {
-            zeron_proto::SandboxLevel::DangerFullAccess
+            kratos_proto::SandboxLevel::DangerFullAccess
         };
         let mut cmd = Command::new(&exe);
         cmd.arg("app-server");
@@ -648,7 +648,7 @@ impl CodexHarness {
             tokio::spawn(async move {
                 let mut lines = tokio::io::BufReader::new(stderr).lines();
                 while let Ok(Some(line)) = lines.next_line().await {
-                    tracing::debug!(target: "zeron_harness::codex", "stderr: {line}");
+                    tracing::debug!(target: "kratos_harness::codex", "stderr: {line}");
                     tail.push(&line);
                 }
             });
@@ -792,7 +792,7 @@ async fn run_session(session: Session) {
 
     // ---- wire params ------------------------------------------------------
     // Parity with the Claude adapter, which auto-approves every `can_use_tool`
-    // regardless of `auto_approve` (zeron sessions run unattended; combined
+    // regardless of `auto_approve` (kratos sessions run unattended; combined
     // with the danger-full-access override above this is codex's yolo mode):
     // never surface wire approvals. "on-request" turned
     // every command into a yes/no question (user report: "asking me for
@@ -856,8 +856,8 @@ async fn run_session(session: Session) {
                 "initialize",
                 json!({
                     "clientInfo": {
-                        "name": "zeron-native",
-                        "title": "Zeron",
+                        "name": "kratos-native",
+                        "title": "Kratos",
                         "version": env!("CARGO_PKG_VERSION"),
                     },
                     "capabilities": { "experimentalApi": true },
@@ -891,7 +891,7 @@ async fn run_session(session: Session) {
                 // A missing/foreign rollout falls back to a fresh thread.
                 Err(e) => {
                     tracing::debug!(
-                        target: "zeron_harness::codex",
+                        target: "kratos_harness::codex",
                         "thread/resume failed (starting fresh): {e}"
                     );
                     client
@@ -1317,7 +1317,7 @@ async fn run_session(session: Session) {
                             // fallback for older Codex without steering).
                             Err(e) => {
                                 tracing::debug!(
-                                    target: "zeron_harness::codex",
+                                    target: "kratos_harness::codex",
                                     "turn/steer rejected (queued as next turn): {e}"
                                 );
                                 if router.active.as_deref() == Some(expected.as_str())
@@ -1374,7 +1374,7 @@ async fn run_session(session: Session) {
                             .await
                         {
                             tracing::debug!(
-                                target: "zeron_harness::codex",
+                                target: "kratos_harness::codex",
                                 "turn/interrupt failed (escalation will reap): {e}"
                             );
                         }
@@ -1477,7 +1477,7 @@ async fn steer_as_new_turn(
 }
 
 // ---------------------------------------------------------------------------
-// Approvals (approval-as-input parity with zeron's UX)
+// Approvals (approval-as-input parity with kratos's UX)
 // ---------------------------------------------------------------------------
 
 type RequestInputFn = Box<
@@ -1532,7 +1532,7 @@ fn handle_server_request(
     );
     if !is_approval {
         tracing::debug!(
-            target: "zeron_harness::codex",
+            target: "kratos_harness::codex",
             "unhandled server request: {method}"
         );
         client.respond_error(&id, -32601, &format!("unsupported method: {method}"));

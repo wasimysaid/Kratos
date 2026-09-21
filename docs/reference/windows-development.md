@@ -1,8 +1,8 @@
 # Windows development
 
 Windows supports native x64 source builds and portable release ZIPs. Release
-packages offer in-app updates through GitHub; keep `zeron-update.json` beside
-`zeron.exe`. Installers and background services are not supported yet.
+packages offer in-app updates through GitHub; keep `kratos-update.json` beside
+`kratos.exe`. Installers and background services are not supported yet.
 
 ## Build and run
 
@@ -10,20 +10,20 @@ Install stable MSVC Rust, Visual Studio C++ build tools, Windows SDK, CMake,
 and Git for Windows, then run:
 
 ```powershell
-cargo run --locked -p zeron
+cargo run --locked -p kratos
 ```
 
 Close the app before rebuilding. For release builds, use
-`cargo build --release --locked -p zeron`. If shader compiler discovery fails,
+`cargo build --release --locked -p kratos`. If shader compiler discovery fails,
 set `GPUI_FXC_PATH` to the Windows SDK's `fxc.exe`.
 
 ## Configuration and agent support
 
 | Setting | Behavior |
 | --- | --- |
-| Application data | `%LOCALAPPDATA%\Zeron`, falling back to `%USERPROFILE%\AppData\Local\Zeron`. Override with `ZERON_DATA_DIR`. |
-| Managed adapters | `ZERON_ADAPTERS_DIR`, then `ZERON_DATA_DIR/adapters`, then the default application's `adapters` directory. |
-| Provider credentials | Keep their provider-owned locations; changing Zeron's data root does not migrate them. |
+| Application data | `%LOCALAPPDATA%\Kratos`, falling back to `%USERPROFILE%\AppData\Local\Kratos`. Override with `KRATOS_DATA_DIR`. |
+| Managed adapters | `KRATOS_ADAPTERS_DIR`, then `KRATOS_DATA_DIR/adapters`, then the default application's `adapters` directory. |
+| Provider credentials | Keep their provider-owned locations; changing Kratos's data root does not migrate them. |
 | `CODEX_EXECUTABLE` | Executable override. `.exe` (and `.com`) launch directly; `.cmd`/`.bat` shims launch through a wrapped `cmd.exe` with literal, individually escaped arguments. The override must exist on disk. |
 
 ACP, Claude, Codex, and opencode search PATH and known native installation
@@ -64,9 +64,9 @@ ConPTY, locking, UI behavior, and shader layouts. Shared Rust regressions run
 on Linux and macOS. To run the engine and harness checks locally:
 
 ```powershell
-cargo test --locked -p zeron-engine -p zeron-harness --lib
-cargo test --locked -p zeron-harness --features native-fixture --test codex_availability --test windows_native
-cargo test --locked -p zeron-engine --test codex_catalog --test codex_login_resolution --test auth
+cargo test --locked -p kratos-engine -p kratos-harness --lib
+cargo test --locked -p kratos-harness --features native-fixture --test codex_availability --test windows_native
+cargo test --locked -p kratos-engine --test codex_catalog --test codex_login_resolution --test auth
 ```
 
 Fixtures use synthetic agents, so these tests do not establish authenticated
@@ -74,7 +74,7 @@ provider compatibility. GUI probes are optional CI dispatch checks and can
 also run on an interactive Windows desktop after building the release app:
 
 ```powershell
-cargo build --release --locked -p zeron-ui --example windows-render-fixture --features windows-render-fixture
+cargo build --release --locked -p kratos-ui --example windows-render-fixture --features windows-render-fixture
 ./scripts/test-windows-lifecycle.ps1 -Runs 5
 ./scripts/test-windows-rendering.ps1
 ```

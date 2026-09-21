@@ -1,6 +1,6 @@
-# Zeron architecture
+# Kratos architecture
 
-Zeron is a native multi-device controller for coding agents. Every installation runs the Rust engine; the desktop and iOS applications are viewports over typed RPC. A fresh installation is local-only and needs no account or network service.
+Kratos is a native multi-device controller for coding agents. Every installation runs the Rust engine; the desktop and iOS applications are viewports over typed RPC. A fresh installation is local-only and needs no account or network service.
 
 ## Runtime topology
 
@@ -12,7 +12,7 @@ headed UI ── local IPC/in-memory RPC ── engine ── local stores and r
                                                                            └── iOS viewport
 ```
 
-Tailcat supplies private connectivity only. Zeron supplies application authentication, authorization, durable synchronization, storage, and RPC framing. The application starts and supervises the pinned `kratos-tailcat` adapter; users do not run Tailcat commands manually.
+Tailcat supplies private connectivity only. Kratos supplies application authentication, authorization, durable synchronization, storage, and RPC framing. The application starts and supervises the pinned `kratos-tailcat` adapter; users do not run Tailcat commands manually.
 
 One installation initializes the profile's durable peer. Keep that installation running on an always-on machine when devices must catch up without overlapping online. Other installations join with short-lived, one-use invitations. Persistent Ed25519 device keys, proof-of-possession challenges, profile-bound bearer tokens, and immediate revocation protect every application route. A Tailcat address is secret but is not accepted as authorization by itself.
 
@@ -47,7 +47,7 @@ Uploads are staged in the active profile's local upload directory. Pending refer
 
 ### Backups
 
-The durable peer creates consistent periodic recovery generations under its private peer directory. `zeron peer backup` and `zeron peer restore` support recovery of the new peer's data, trust database and transport identity; see `docs/peer-backup.md`. Backup/restore is not an old-backend or local-profile import path.
+The durable peer creates consistent periodic recovery generations under its private peer directory. `kratos peer backup` and `kratos peer restore` support recovery of the new peer's data, trust database and transport identity; see `docs/peer-backup.md`. Backup/restore is not an old-backend or local-profile import path.
 
 ## Engine and UI composition
 
@@ -58,14 +58,14 @@ The durable peer creates consistent periodic recovery generations under its priv
 - `crates/harness`: Claude Code, Codex, Cursor, Devin, Grok, Hermes, Pi, and Mimir adapters.
 - `crates/ui`: gpui desktop viewport; browser, transcript, queue, composer, terminal, diff, and device/pairing surfaces.
 - `apps/ios`: SwiftUI viewport with the native Tailcat bridge and profile-scoped offline cache.
-- `apps/zeron`: headed/headless binary and peer, backup/restore, daemon, installer, and updater CLI.
+- `apps/kratos`: headed/headless binary and peer, backup/restore, daemon, installer, and updater CLI.
 - `connectivity/tailcat`: pinned application adapter and native packaging sources.
 
-The headed application first probes localhost IPC. It attaches to an existing daemon when available; otherwise it embeds an engine and serves the same typed protocol. `zeron headless` runs the same engine without a viewport.
+The headed application first probes localhost IPC. It attaches to an existing daemon when available; otherwise it embeds an engine and serves the same typed protocol. `kratos headless` runs the same engine without a viewport.
 
 ## Connectivity and deployment
 
-The packaged adapter is adjacent to the executable. Source/development runs may set `ZERON_TAILCAT_ADAPTER` to an explicitly built adapter. Public DERP relays are rate-limited, log connection metadata, and have no availability guarantee; production operators who require durable relay service should pass an owned HTTPS DERP map when initializing the peer. Direct UDP remains opportunistic and relay-only operation is supported.
+The packaged adapter is adjacent to the executable. Source/development runs may set `KRATOS_TAILCAT_ADAPTER` to an explicitly built adapter. Public DERP relays are rate-limited, log connection metadata, and have no availability guarantee; production operators who require durable relay service should pass an owned HTTPS DERP map when initializing the peer. Direct UDP remains opportunistic and relay-only operation is supported.
 
 Static landing content deploys with GitHub Pages. Installers, manifests, and update artifacts are GitHub Release assets. The runtime has no hosted application backend and requires no provider bearer or deployment credentials.
 

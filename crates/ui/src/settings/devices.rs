@@ -9,8 +9,8 @@ use gpui::{
 };
 use std::time::Duration;
 
-use zeron_proto::WorkspaceScope;
-use zeron_rpc::methods;
+use kratos_proto::WorkspaceScope;
+use kratos_rpc::methods;
 
 use crate::composer::{ComposerInput, ComposerInputEvent};
 use crate::pairing::{
@@ -405,7 +405,7 @@ impl popover::ScrollRailHost for DevicesPage {
     }
 }
 
-/// Human platform label (zeron settings.devices.tsx `platformLabel`).
+/// Human platform label (kratos settings.devices.tsx `platformLabel`).
 pub fn platform_label(platform: &str) -> &str {
     match platform {
         "macos" | "darwin" => "macOS",
@@ -462,7 +462,7 @@ impl Render for DevicesPage {
                 };
                 // Presence lives ON the identity tile: a corner dot (emerald
                 // online with a soft glow, faint offline), ringed by the card
-                // tone so it "cuts" the tile — zeron settings.devices.tsx
+                // tone so it "cuts" the tile — kratos settings.devices.tsx
                 // `border-2 border-[var(--card)]` +
                 // `shadow-[0_0_6px_rgba(52,211,153,0.55)]`.
                 let tile = widgets::row_tile(&theme, platform_icon).relative().child(
@@ -511,7 +511,7 @@ impl Render for DevicesPage {
                             .into_any_element(),
                     );
                 }
-                // "Added {time ago}" — always present (zeron settings.devices.tsx).
+                // "Added {time ago}" — always present (kratos settings.devices.tsx).
                 if let Some(created) = device.created_at {
                     meta.push(
                         div()
@@ -570,7 +570,7 @@ impl Render for DevicesPage {
                         )
                     })
                     .child(
-                        // `opacity-70 hover:opacity-100` (zeron: also rises on
+                        // `opacity-70 hover:opacity-100` (kratos: also rises on
                         // row hover — gpui has no group-hover, so the button's
                         // own hover carries the reveal).
                         widgets::ghost_action(&theme)
@@ -670,7 +670,7 @@ impl Render for DevicesPage {
                             .child(div().flex_1().min_w_0().flex().flex_col()
                                 .child(div().text_size(crate::typography::ui_rems(12.0)).text_color(theme.text).child("One-time secret invitation ready"))
                                 .child(div().mt(px(2.0)).text_size(crate::typography::ui_rems(10.5)).text_color(theme.text_muted)
-                                    .child("Copy it now. Zeron does not save it in UI settings.")))
+                                    .child("Copy it now. Kratos does not save it in UI settings.")))
                             .child(popover::btn_primary(&theme, "Copy invitation")
                                 .id("peer-copy-invite").on_click(cx.listener(|this, _, _, cx| this.copy_invitation(cx))))
                     );

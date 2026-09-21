@@ -62,7 +62,7 @@ server.Close()
 The binding creates `client.key` or `server.key` in `stateDir`. It uses userspace networking only: no command execution, process spawning, privileged VPN, route changes, DNS changes, or arbitrary destination forwarding.
 
 
-Release packages place `kratos-tailcat` adjacent to `zeron` (inside `Contents/MacOS` on macOS). The Windows ZIP is the supported portable download and contains both executables plus a checksum-bound preserve policy; the versioned standalone `zeron-...exe` release asset is updater payload for an existing ZIP installation, not a complete fresh installation. Windows uses the containing profile directory's private ACL because POSIX `0600` mode bits are not represented there.
+Release packages place `kratos-tailcat` adjacent to `kratos` (inside `Contents/MacOS` on macOS). The Windows ZIP is the supported portable download and contains both executables plus a checksum-bound preserve policy; the versioned standalone `kratos-...exe` release asset is updater payload for an existing ZIP installation, not a complete fresh installation. Windows uses the containing profile directory's private ACL because POSIX `0600` mode bits are not represented there.
 
 ## Build
 

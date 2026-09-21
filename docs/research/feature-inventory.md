@@ -1,4 +1,4 @@
-# Zeron — Complete Feature Inventory (parity checklist for the native rewrite)
+# Kratos — Complete Feature Inventory (parity checklist for the native rewrite)
 
 Source: exploration of the original application on 2026-07-19, amended after the
 Tailcat/Rust-peer replacement. The inventory preserves unrelated feature detail;
@@ -18,12 +18,12 @@ provider-specific backend prescriptions are superseded by `ARCHITECTURE.md`.
 ### 1.1 Window shell
 - 1320x880 (min 900x600), frameless-inset title bar, traffic lights {14,15}, opaque #0a0a0a bg.
 - External links open in OS browser; single-instance lock; dev vs packaged ports (26634/26654) and
-  data dirs (.zeron-dev/.zeron). Fullscreen hides traffic lights -> cluster reflows.
+  data dirs (.kratos-dev/.kratos). Fullscreen hides traffic lights -> cluster reflows.
 
 ### 1.2 App phases (App.tsx)
 - Three phases with crossfade: Gate (loading/reconnect/login card over bg-grid), OrgGate ("Create
   your workspace" + existing org memberships + "Use a different account"), app (router).
-- Boot Splash: zeron-wave loader, fades out (splash-out) once connected && authReady (15s cap),
+- Boot Splash: kratos-wave loader, fades out (splash-out) once connected && authReady (15s cap),
   never returns mid-session.
 
 ### 1.3 Shell layout (__root.tsx)
@@ -74,7 +74,7 @@ provider-specific backend prescriptions are superseded by `ARCHITECTURE.md`.
 - Pickers: HarnessModelPicker (harness rail + models, harness locked once chat exists),
   TraitsPicker (reasoning + advertised model options; trigger shows non-defaults "High · 1M · Fast"),
   RepoPicker (search, Open folder… in-app browser w/ breadcrumbs + keys + skeletons, Clone from
-  URL…, Create new repo…), BranchPicker (search + isolated-worktree toggle ~/.zeron/worktrees/…).
+  URL…, Create new repo…), BranchPicker (search + isolated-worktree toggle ~/.kratos/worktrees/…).
 
 ### 1.8 Conversation / transcript
 - ONE transcript source = doc projection. Optimistic echoes until first doc frame.
@@ -113,7 +113,7 @@ provider-specific backend prescriptions are superseded by `ARCHITECTURE.md`.
   elapsed; "Sending…" bridge; staleness-checked; survives reload; shows for remote runs.
 - fade-in 0.5s cubic-bezier(0.16,1,0.3,1) translateY 4->0 (entrances)
 - splash-out 0.5s opacity+translateY -6, 0.15s delay
-- zeron-pulse 2.4s infinite staggered cell opacity 0.08->1 scale 0.9->1
+- kratos-pulse 2.4s infinite staggered cell opacity 0.08->1 scale 0.9->1
 - gradient-spin-pulse per-cell phase wave, 750ms
 - menu-in 0.14s scale 0.96 + translateY -2 (popovers, transform-origin tracks anchor)
 - dialog-in 0.18s scale 0.96->1

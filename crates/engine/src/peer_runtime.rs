@@ -12,7 +12,7 @@ use axum::middleware;
 use serde::Deserialize;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
-use zeron_sync::peer::PeerStore;
+use kratos_sync::peer::PeerStore;
 
 use crate::peer_auth::{AuthStore, require_peer_principal};
 
@@ -27,7 +27,7 @@ const DEFAULT_BACKUP_INTERVAL: Duration = Duration::from_secs(6 * 60 * 60);
 #[derive(Debug, thiserror::Error)]
 pub enum PeerRuntimeError {
     #[error(
-        "tailcat adapter was not found; expected it adjacent to the executable or set ZERON_TAILCAT_ADAPTER"
+        "tailcat adapter was not found; expected it adjacent to the executable or set KRATOS_TAILCAT_ADAPTER"
     )]
     AdapterNotFound,
     #[error("tailcat adapter failed to start: {0}")]
@@ -45,7 +45,7 @@ pub enum PeerRuntimeError {
     #[error("peer listener failed: {0}")]
     Listener(#[source] std::io::Error),
     #[error("peer store failed: {0}")]
-    Store(#[from] zeron_sync::peer::PeerStoreError),
+    Store(#[from] kratos_sync::peer::PeerStoreError),
 }
 
 #[derive(Clone, Debug)]
@@ -76,7 +76,7 @@ impl PeerRuntimeConfig {
         if let Some(path) = &self.adapter_path {
             return regular_executable(path);
         }
-        if let Some(path) = std::env::var_os("ZERON_TAILCAT_ADAPTER") {
+        if let Some(path) = std::env::var_os("KRATOS_TAILCAT_ADAPTER") {
             return regular_executable(Path::new(&path));
         }
         let current = std::env::current_exe().map_err(PeerRuntimeError::AdapterStart)?;
@@ -172,9 +172,9 @@ impl PeerRuntime {
         let peer_dir = config.data_dir.join("peer");
         create_private_dir(&peer_dir).map_err(PeerRuntimeError::AdapterStart)?;
         let store = PeerStore::open(peer_dir.join("peer.sqlite"))?;
-        let previews = zeron_sync::peer::preview::PreviewState::default();
-        let protected_routes = zeron_sync::peer::router(store.clone())
-            .merge(zeron_sync::peer::preview::router(previews.clone()))
+        let previews = kratos_sync::peer::preview::PreviewState::default();
+        let protected_routes = kratos_sync::peer::router(store.clone())
+            .merge(kratos_sync::peer::preview::router(previews.clone()))
             .layer(middleware::from_fn_with_state(
                 auth_store.clone(),
                 require_peer_principal,

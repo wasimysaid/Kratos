@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use futures::{StreamExt, stream::BoxStream};
 use tokio::sync::mpsc;
-use zeron_doc::{MessagePart, MessageRole, MessageStatus};
-use zeron_engine::{EngineCore, HarnessRegistry};
-use zeron_harness::{Harness, HarnessError, RunControls};
-use zeron_proto::{
+use kratos_doc::{MessagePart, MessageRole, MessageStatus};
+use kratos_engine::{EngineCore, HarnessRegistry};
+use kratos_harness::{Harness, HarnessError, RunControls};
+use kratos_proto::{
     AgentEvent, ChatConfig, DoneStatus, HarnessId, Model, ReasoningLevel, RunRequest, SandboxLevel,
     SessionStatus, SteeringMode, ToolCall, UserInputQuestion,
 };

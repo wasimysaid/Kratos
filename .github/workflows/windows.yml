@@ -6,7 +6,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
-      - 'apps/zeron/**'
+      - 'apps/kratos/**'
       - 'dist/windows/**'
       - 'crates/**'
       - 'scripts/test-windows-*.ps1'
@@ -22,7 +22,7 @@ on:
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
-      - 'apps/zeron/**'
+      - 'apps/kratos/**'
       - 'dist/windows/**'
       - 'crates/**'
       - 'scripts/test-windows-*.ps1'
@@ -90,32 +90,42 @@ jobs:
           cache-on-failure: true
           cache-workspace-crates: true
       - name: Native harness security and integration tests
-        run: cargo test --release --locked -p zeron-harness --features native-fixture --lib --test codex_availability --test windows_native
+        run: cargo test --release --locked -p kratos-harness --features native-fixture --lib --test codex_availability --test windows_native
       - name: UI tests
         env:
           RUST_BACKTRACE: '1'
         run: |
           # Native platform initialization runs in its own process. Keep the
           # real-font assertion and the complete headless suite mandatory.
-          cargo test --release --locked -p zeron-ui --lib native_diff_font_geometry -- --test-threads=1 --nocapture
+          cargo test --release --locked -p kratos-ui --lib native_diff_font_geometry -- --test-threads=1 --nocapture
           $nativeResult = $LASTEXITCODE
-          cargo test --release --locked -p zeron-ui --lib -- --test-threads=1 --skip native_diff_font_geometry --nocapture
+          cargo test --release --locked -p kratos-ui --lib -- --test-threads=1 --skip native_diff_font_geometry --nocapture
           $headlessResult = $LASTEXITCODE
           if ($nativeResult -ne 0 -or $headlessResult -ne 0) { exit 1 }
       - name: Build application
-        run: cargo build --release --locked -p zeron
+        run: cargo build --release --locked -p kratos
       - name: Verify portable packaging
         run: ./scripts/package-windows.ps1 -ReleasesUrl "https://github.com/$env:GITHUB_REPOSITORY/releases/latest/download"
+      - name: Upload portable package
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: kratos-windows-portable
+          path: |
+            target/package/kratos-*-windows-x86_64.zip
+            target/package/kratos-*-windows-x86_64.exe
+          if-no-files-found: error
+          retention-days: 7
       - name: Shader layout tests
         run: cargo test --release --locked -p gpui_windows --lib layout
       - name: Application and updater tests
-        run: cargo test --release --locked -p zeron -p zeron-update
+        run: cargo test --release --locked -p kratos -p kratos-update
       - name: Engine unit tests
-        run: cargo test --release --locked -p zeron-engine --lib
+        run: cargo test --release --locked -p kratos-engine --lib
       - name: Harness catalog and login tests
-        run: cargo test --release --locked -p zeron-engine --test codex_catalog --test codex_login_resolution
+        run: cargo test --release --locked -p kratos-engine --test codex_catalog --test codex_login_resolution
       - name: Auth integration tests
-        run: cargo test --release --locked -p zeron-engine --test auth
+        run: cargo test --release --locked -p kratos-engine --test auth
       - name: GUI subsystem and redirected CLI output
         run: ./scripts/test-windows-startup.ps1
       - name: CLI startup without HOME
@@ -123,18 +133,18 @@ jobs:
           # Exercise real path resolution without touching the runner's account.
           # Port zero cannot connect to another running engine.
           $env:HOME = $null
-          $env:ZERON_DATA_DIR = $null
-          $env:ZERON_EDGE_TOKEN = $null
-          $env:ZERON_IPC_PORT = '0'
-          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP "zeron smoke O'Brien 日本語"
-          $expected = Join-Path $env:LOCALAPPDATA 'Zeron'
+          $env:KRATOS_DATA_DIR = $null
+          $env:KRATOS_EDGE_TOKEN = $null
+          $env:KRATOS_IPC_PORT = '0'
+          $env:LOCALAPPDATA = Join-Path $env:RUNNER_TEMP "kratos smoke O'Brien 日本語"
+          $expected = Join-Path $env:LOCALAPPDATA 'Kratos'
           if (Test-Path -LiteralPath $expected) {
             throw 'Windows startup path fixture must begin absent'
           }
-          $output = & ./target/release/zeron.exe status
+          $output = & ./target/release/kratos.exe status
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $probe = [Diagnostics.ProcessStartInfo]::new()
-          $probe.FileName = (Resolve-Path -LiteralPath './target/release/zeron.exe').Path
+          $probe.FileName = (Resolve-Path -LiteralPath './target/release/kratos.exe').Path
           $probe.Arguments = 'status'
           $probe.UseShellExecute = $false
           $probe.CreateNoWindow = $true
@@ -153,7 +163,7 @@ jobs:
           } finally { $process.Dispose() }
           $output
           if (-not (Test-Path -LiteralPath $expected -PathType Container)) {
-            throw 'Windows startup did not create LOCALAPPDATA/Zeron'
+            throw 'Windows startup did not create LOCALAPPDATA/Kratos'
           }
           $status = ($output -join [Environment]::NewLine) | ConvertFrom-Json
           foreach ($property in @('signedIn', 'hosting', 'connected', 'profileId', 'deviceId')) {
@@ -170,14 +180,14 @@ jobs:
           }
       - name: Build rendering fixture
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_gui }}
-        run: cargo build --release --locked -p zeron-ui --example windows-render-fixture --features windows-render-fixture
+        run: cargo build --release --locked -p kratos-ui --example windows-render-fixture --features windows-render-fixture
       - name: Upload GUI test binaries
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.native_gui }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-gui-binaries
           path: |
-            target/release/zeron.exe
+            target/release/kratos.exe
             target/release/examples/windows-render-fixture.exe
           if-no-files-found: error
           retention-days: 1

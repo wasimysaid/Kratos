@@ -49,7 +49,7 @@ engine B ── RegistryDoc ── RegistryClient ──────────
 - **RegistryClient** (`crates/sync/src/registry.rs`): WS transport — hello/cursor handshake,
   push/ack, rows broadcasts, presence, probe/redial liveness (same deaf-socket discipline
   as `RoomClient`), reconnect with backoff. Fills the same `RoomStatsSnapshot` the
-  SyncStatus RPC and `zeron sync` already render.
+  SyncStatus RPC and `kratos sync` already render.
 
 ## Wire protocol (JSON text frames)
 

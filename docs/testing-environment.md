@@ -84,8 +84,8 @@ pkg-config --modversion webkit2gtk-4.1 json-glib-1.0 xkbcommon xkbcommon-x11 xcb
 flags=( $(pkg-config --cflags --libs webkit2gtk-4.1 json-glib-1.0) )
 "$CC" -std=c11 -O2 -Wall -Wextra -Wno-unused-parameter \
   crates/ui/src/browser/linux/helper.c \
-  -o "$TOOLS/zeron-webkit-real" "${flags[@]}"
-ldd "$TOOLS/zeron-webkit-real"
+  -o "$TOOLS/kratos-webkit-real" "${flags[@]}"
+ldd "$TOOLS/kratos-webkit-real"
 ```
 
 Expected versions for the Ubuntu 26.04.1 archives used here are WebKitGTK
@@ -105,7 +105,7 @@ xvfb_pid=$!
 for _ in $(seq 1 100); do test -s "$runtime/display" && break; sleep .1; done
 export DISPLAY=":$(cat "$runtime/display")"
 "$TOOLS/xdotool" getdisplaygeometry
-(sleep 5) | "$TOOLS/zeron-webkit-real" >/dev/null 2>"$runtime/helper.log" &
+(sleep 5) | "$TOOLS/kratos-webkit-real" >/dev/null 2>"$runtime/helper.log" &
 helper_pid=$!
 sleep 2
 kill -0 "$helper_pid" # native WebKit helper stayed alive on Xvfb
@@ -117,7 +117,7 @@ For the full real browser fixture, build and run the repository script with the
 same exports above:
 
 ```sh
-cargo build --release --locked -p zeron-ui \
+cargo build --release --locked -p kratos-ui \
   --example browser-fixture --features browser-fixture
 BROWSER_FIXTURE_BINARY=target/release/examples/browser-fixture \
   bash scripts/test-linux-browser.sh target/verification/linux-browser
@@ -143,16 +143,16 @@ The following checks were run in this checkout:
 * An isolated Xvfb `xclock` window was captured to
   `target/verification/native-xvfb/xclock.png` with the project-local adapter;
   the PNG was inspected and measured as `502x182`.
-* The explicit main build `cargo build --release --locked -p zeron --bin zeron`
+* The explicit main build `cargo build --release --locked -p kratos --bin kratos`
   passes, and the combined main/fixture release build also passes.
-* `zeron --help`, `peer --help`, `pair --help`, `sync --help`,
+* `kratos --help`, `peer --help`, `pair --help`, `sync --help`,
   and `daemon --help` all exit
-  successfully. A fresh `ZERON_DATA_DIR` `zeron status` reports signed-out,
+  successfully. A fresh `KRATOS_DATA_DIR` `kratos status` reports signed-out,
   local-only state without secrets.
 * The actual main binary launched under isolated Xvfb with
-  `ZERON_NO_LOGIN_SHELL=1`, assembled a fresh local engine/device, and exposed
+  `KRATOS_NO_LOGIN_SHELL=1`, assembled a fresh local engine/device, and exposed
   a window. The real app Devices management view was captured and inspected
-  at `target/verification/zeron-native-attempt5/settings-management2.png`
+  at `target/verification/kratos-native-attempt5/settings-management2.png`
   (1280x800): the Devices page shows the local device, private sync-peer
   status, local-only scope, and Rename/Refresh controls with no clipping.
 * The browser fixture also ran to completion with exit code 0 under real

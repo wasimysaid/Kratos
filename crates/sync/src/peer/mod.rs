@@ -22,7 +22,7 @@ use futures::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tokio::sync::mpsc;
-use zeron_doc::RowOp;
+use kratos_doc::RowOp;
 
 use store::{MAX_CHECKPOINT_BYTES, MAX_SIDECAR_BYTES, MAX_TOOL_BLOB_BYTES};
 pub use store::{PeerStore, PeerStoreError};

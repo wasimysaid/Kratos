@@ -1,7 +1,7 @@
-//! The app shell (zeron `__root.tsx`): sidebar column + main panel + optional
+//! The app shell (kratos `__root.tsx`): sidebar column + main panel + optional
 //! right "Changes" pane, plus the boot splash and the connection gate.
 //!
-//! Layout is zeron's: collapsible drag-resizable sidebar (224–400px, default
+//! Layout is kratos's: collapsible drag-resizable sidebar (224–400px, default
 //! 256) with a 200ms ease-out width transition; main panel with an h-11 header,
 //! content outlet, and a reserved h-6 status strip so later content never
 //! shifts; right pane scaffold (360px floor, default 520), hidden by default.
@@ -23,9 +23,9 @@ use gpui::{
 };
 
 use gpui_tokio::Tokio;
-use zeron_engine::InstanceLock;
-use zeron_proto::{AuthState, WorkspaceScope};
-use zeron_rpc::methods;
+use kratos_engine::InstanceLock;
+use kratos_proto::{AuthState, WorkspaceScope};
+use kratos_rpc::methods;
 
 use crate::changes::{Changes, ChangesEvent};
 use crate::composer::{Composer, ComposerEvent, ComposerInput, ComposerInputEvent};
@@ -391,7 +391,7 @@ pub struct JumpSession(pub usize);
 // ---------------------------------------------------------------------------
 
 /// Where the top-left window-control cluster starts, in px from the window's
-/// left edge (zeron window-controls.tsx: `left: fullscreen ? 12 : 88`). The
+/// left edge (kratos window-controls.tsx: `left: fullscreen ? 12 : 88`). The
 /// frameless hiddenInset chrome puts the macOS traffic lights at {14,15};
 /// fullscreen hides them and the cluster reclaims the inset.
 pub fn titlebar_cluster_start(fullscreen: bool) -> f32 {
@@ -440,7 +440,7 @@ pub fn caption_buttons_width(count: usize) -> f32 {
 }
 
 /// Where the cluster's first button starts, from the window's left edge.
-/// `linux_left_captions` is the number of caption buttons zeron draws at the
+/// `linux_left_captions` is the number of caption buttons kratos draws at the
 /// top-left on Linux (GNOME `close:…` layouts) — the app cluster follows them
 /// at the shared 2px rhythm.
 pub fn cluster_buttons_start(is_macos: bool, fullscreen: bool, linux_left_captions: usize) -> f32 {
@@ -487,7 +487,7 @@ pub fn apply_keymap(
     cx.clear_key_bindings();
     // `clear_key_bindings` also removes the contextual editing actions that
     // gpui-base installed at startup. Reinitialize the component layer before
-    // rebuilding Zeron's bindings so the file editor keymap remains active.
+    // rebuilding Kratos's bindings so the file editor keymap remains active.
     gpui_base::init(cx);
     crate::composer::init(cx, composer_send_behavior);
     // Fixed app-level shortcuts (Settings on every platform; ⌘Q quit, ⌘W
@@ -597,7 +597,7 @@ impl SettingsSection {
         SettingsSection::Archived,
     ];
 
-    /// Sidebar + header label (zeron settings-sidebar.tsx SECTIONS / __root.tsx
+    /// Sidebar + header label (kratos settings-sidebar.tsx SECTIONS / __root.tsx
     /// `settingsTitle` — the same strings in both places).
     pub fn label(self) -> &'static str {
         match self {
@@ -665,7 +665,7 @@ fn workspace_file_title(path: &str) -> SharedString {
     path.rsplit('/').next().unwrap_or(path).to_string().into()
 }
 
-/// Per-chat panel open flags (zeron parity: `sessionPanels` — the terminal and
+/// Per-chat panel open flags (kratos parity: `sessionPanels` — the terminal and
 /// changes panels open *per session*, in memory only; heights and every other
 /// persisted setting stay global).
 ///
@@ -715,7 +715,7 @@ impl SessionPanels {
     }
 }
 
-/// One route-history entry (zeron parity: the renderer's TanStack memory
+/// One route-history entry (kratos parity: the renderer's TanStack memory
 /// history — every route the user visited, browser-style).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NavEntry {
@@ -725,7 +725,7 @@ pub enum NavEntry {
 }
 
 /// Browser-style navigation history for the titlebar back/forward buttons
-/// (zeron window-controls.tsx semantics): every route change pushes an entry;
+/// (kratos window-controls.tsx semantics): every route change pushes an entry;
 /// Back/Forward walk the stack without changing it; pushing while behind the
 /// tip truncates the entries ahead (a new branch, exactly like a browser).
 #[derive(Debug)]
@@ -759,7 +759,7 @@ impl NavHistory {
     }
 
     /// Swap the current entry in place without growing the stack — the native
-    /// equivalent of a `replace: true` navigation (zeron's boot redirect from
+    /// equivalent of a `replace: true` navigation (kratos's boot redirect from
     /// `/` into the last-used chat leaves no dead Back target behind).
     pub fn replace(&mut self, entry: NavEntry) {
         self.entries[self.index] = entry;
@@ -770,7 +770,7 @@ impl NavHistory {
     }
 
     /// Memory history keeps every entry, so "behind the last entry" is exactly
-    /// "can go forward" (zeron window-controls.tsx).
+    /// "can go forward" (kratos window-controls.tsx).
     pub fn can_forward(&self) -> bool {
         self.index + 1 < self.entries.len()
     }
@@ -1573,7 +1573,7 @@ pub struct Shell {
     update_dismissed: Option<String>,
     /// How this binary was installed — decides the strip's click behavior.
     /// Cached: `detect_install` stats `current_exe` and this renders per frame.
-    install: zeron_update::InstallKind,
+    install: kratos_update::InstallKind,
     pairing: Option<PairingGateUi>,
     sync_flow: SyncFlow,
     mutate_task: Option<Task<()>>,
@@ -1603,8 +1603,8 @@ pub struct Shell {
     /// Last observed `window.is_window_active()` — rising edge fires a
     /// ProbeSync so a broadcast-deaf room heals as the user looks at the app.
     was_window_active: bool,
-    /// Dev/testing knobs (`ZERON_OPEN_DIALOG`, `ZERON_FORCE_GATE`,
-    /// `ZERON_DEMO_UPLOAD`) — see [`Shell::new`].
+    /// Dev/testing knobs (`KRATOS_OPEN_DIALOG`, `KRATOS_FORCE_GATE`,
+    /// `KRATOS_DEMO_UPLOAD`) — see [`Shell::new`].
     debug_dialog: Option<String>,
     debug_gate: Option<GatePhase>,
     debug_upload: Option<String>,
@@ -1646,7 +1646,7 @@ pub struct Shell {
     /// Armed by mouse-down on a titlebar strip; the next mouse-move hands the
     /// drag to the compositor (zed's platform-titlebar pattern).
     titlebar_should_move: bool,
-    /// The caption buttons zeron itself draws on Linux under client-side
+    /// The caption buttons kratos itself draws on Linux under client-side
     /// decorations, per side, already filtered to what the compositor
     /// supports — `None` off Linux or under server decorations (where the WM
     /// draws real buttons). Re-resolved every frame at the top of `render`.
@@ -1752,8 +1752,8 @@ impl Shell {
                             // same per-second refresh while degraded.
                             || matches!(
                                 s.connectivity.state,
-                                zeron_proto::ConnectivityState::Offline
-                                    | zeron_proto::ConnectivityState::Reconnecting
+                                kratos_proto::ConnectivityState::Offline
+                                    | kratos_proto::ConnectivityState::Reconnecting
                             )
                     };
                     // Relative sidebar times still advance when unchanged
@@ -1776,10 +1776,10 @@ impl Shell {
         crate::appshots::set_capture_sound_enabled(settings.appshot_sound_enabled);
         // Bind the customizable shortcuts from the persisted keymap.
         apply_keymap(cx, &settings.keymap, settings.composer_send_behavior);
-        // Dev/testing knob: `ZERON_OPEN_ROUTE=settings[/<section>]` boots
+        // Dev/testing knob: `KRATOS_OPEN_ROUTE=settings[/<section>]` boots
         // straight into a settings section — these pages have no deep link and
         // synthetic input can't reach them on headless compositors.
-        let route = match std::env::var("ZERON_OPEN_ROUTE").ok().as_deref() {
+        let route = match std::env::var("KRATOS_OPEN_ROUTE").ok().as_deref() {
             Some("settings") | Some("settings/devices") => {
                 Route::Settings(SettingsSection::Devices)
             }
@@ -1797,21 +1797,21 @@ impl Shell {
             }
             _ => Route::Chat,
         };
-        // More capture knobs of the same kind: `ZERON_OPEN_DIALOG=rename|delete`
+        // More capture knobs of the same kind: `KRATOS_OPEN_DIALOG=rename|delete`
         // opens that dialog for the first chat once chats land; `=model` pops
         // the combined harness/model menu once the shell is Ready;
-        // `ZERON_FORCE_GATE=signin|org|failed` renders that gate regardless of
+        // `KRATOS_FORCE_GATE=signin|org|failed` renders that gate regardless of
         // real auth state (display-only — for styling passes).
-        let debug_dialog = std::env::var("ZERON_OPEN_DIALOG").ok();
-        // `ZERON_DEMO_UPLOAD=<pct>:<image path>` fabricates an in-flight image
+        let debug_dialog = std::env::var("KRATOS_OPEN_DIALOG").ok();
+        // `KRATOS_DEMO_UPLOAD=<pct>:<image path>` fabricates an in-flight image
         // send on the selected chat (echo bubble + frozen thumbnail progress
         // ring) — display-only; a real upload can't be paused for a capture.
-        let debug_upload = std::env::var("ZERON_DEMO_UPLOAD").ok();
-        let debug_gate = match std::env::var("ZERON_FORCE_GATE").ok().as_deref() {
+        let debug_upload = std::env::var("KRATOS_DEMO_UPLOAD").ok();
+        let debug_gate = match std::env::var("KRATOS_FORCE_GATE").ok().as_deref() {
             Some("signin") => Some(GatePhase::SignIn),
             Some("org") => Some(GatePhase::OrgGate),
             Some("failed") => Some(GatePhase::Failed(
-                "Could not reach the zeron engine on port 27901".into(),
+                "Could not reach the kratos engine on port 27901".into(),
             )),
             _ => None,
         };
@@ -1908,7 +1908,7 @@ impl Shell {
             update_flow: UpdateFlow::Idle,
             update_task: None,
             update_dismissed: None,
-            install: zeron_update::detect_install(),
+            install: kratos_update::detect_install(),
             pairing: None,
             sync_flow: SyncFlow::Idle,
             mutate_task: None,
@@ -2072,7 +2072,7 @@ impl Shell {
                 _ => {}
             }
         }
-        // Capture knob: `ZERON_DEMO_UPLOAD=<pct>:<image path>` — once a chat
+        // Capture knob: `KRATOS_DEMO_UPLOAD=<pct>:<image path>` — once a chat
         // is selected, push a fake sending echo carrying that image as a
         // pending attachment and freeze upload progress at <pct>, so the
         // thumbnail progress ring can be styled/screenshotted (a real upload
@@ -2107,10 +2107,10 @@ impl Shell {
                     "Here is the screenshot of the bug.",
                     std::slice::from_ref(&pending_path),
                 );
-                let echo = zeron_doc::SessionMessageEntry {
+                let echo = kratos_doc::SessionMessageEntry {
                     id: "demo-upload-echo".into(),
-                    role: zeron_doc::MessageRole::User,
-                    parts: vec![zeron_doc::MessagePart::Text {
+                    role: kratos_doc::MessageRole::User,
+                    parts: vec![kratos_doc::MessagePart::Text {
                         id: "t0".into(),
                         text,
                     }],
@@ -2165,9 +2165,9 @@ impl Shell {
                 )
             };
             // Background-only banners: `active_window()` is app-level (any
-            // Zeron window being key), so a ping for a *background chat* in a
+            // Kratos window being key), so a ping for a *background chat* in a
             // focused app still stays a chime — you're already looking at
-            // Zeron; the sidebar dot carries the rest.
+            // Kratos; the sidebar dot carries the rest.
             let app_focused = cx.active_window().is_some();
             for (chat_id, status, send_pending, title) in sessions {
                 let prev = self.sound_prev.insert(chat_id.clone(), status.clone());
@@ -2212,8 +2212,8 @@ impl Shell {
                     && !(self.settings.notifications_background_only && app_focused)
                 {
                     let body = match connectivity {
-                        zeron_proto::ConnectivityState::Offline => "Your device is offline",
-                        _ => "Zeron is trying to reconnect",
+                        kratos_proto::ConnectivityState::Offline => "Your device is offline",
+                        _ => "Kratos is trying to reconnect",
                     };
                     crate::notify::post("Connection unavailable", body, None);
                 }
@@ -2283,7 +2283,7 @@ impl Shell {
             self.active_chat = selected;
             // Route history: a chat switch is a navigation. The very first
             // selection off the untouched boot canvas REPLACES that entry —
-            // zeron's `/` route redirected into the last-used chat, leaving no
+            // kratos's `/` route redirected into the last-used chat, leaving no
             // dead Back target. Walking history lands here too, but the
             // destination already equals `current()`, so the push dedups.
             if matches!(self.route, Route::Chat) {
@@ -2781,7 +2781,7 @@ impl Shell {
         }
         let mut resolved = activation.clone();
         if resolved.action == LinkAction::Primary {
-            resolved.action = if crate::settings::current(cx).open_web_links_in_zeron {
+            resolved.action = if crate::settings::current(cx).open_web_links_in_kratos {
                 LinkAction::Internal
             } else {
                 LinkAction::External
@@ -3063,7 +3063,7 @@ impl Shell {
     /// (user request).
     fn add_commit_diff_surface(
         &mut self,
-        commit: zeron_proto::GitHistoryCommit,
+        commit: kratos_proto::GitHistoryCommit,
         cx: &mut Context<Self>,
     ) {
         let changes = cx.new(|cx| Changes::for_commit(self.state.clone(), commit, cx));
@@ -3219,7 +3219,7 @@ impl Shell {
                 Duration::from_secs(20),
             )
             .await;
-            let entries: Option<Vec<zeron_doc::SessionMessageEntry>> = reply.ok().and_then(|v| {
+            let entries: Option<Vec<kratos_doc::SessionMessageEntry>> = reply.ok().and_then(|v| {
                 let text = v.get("text")?.as_str()?.to_owned();
                 serde_json::from_str(&text).ok()
             });
@@ -3472,7 +3472,7 @@ impl Shell {
 
     /// Cmd/Ctrl+J and the header button (feature-inventory §1.10). Height
     /// animates 200 ms; closing detaches (PTYs stay alive), opening restores.
-    /// The flag is per chat (zeron `sessionPanels`).
+    /// The flag is per chat (kratos `sessionPanels`).
     fn toggle_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let from = self.terminal_target(cx);
         let key = self.panel_key(cx);
@@ -3485,7 +3485,7 @@ impl Shell {
                 .update(cx, |composer, _| composer.focus_pending = false);
             panel.update(cx, |panel, cx| panel.request_focus(cx));
             // Opening lands keyboard focus IN the shell — typing goes straight
-            // to the prompt, no click needed (zeron terminal-panel.tsx: the
+            // to the prompt, no click needed (kratos terminal-panel.tsx: the
             // visible+active effect calls `terminal.focus()` on every open).
             // The handle is focusable before the panel's first paint; once the
             // terminal body mounts with `track_focus` it receives the keys.
@@ -3494,7 +3494,7 @@ impl Shell {
             // Hiding the panel removes the (likely focused) terminal view;
             // with nothing focused, window key bindings stop dispatching, so
             // hand focus to the composer. (Cmd+J is a pure toggle — a second
-            // press closes even while the terminal is focused, as in zeron's
+            // press closes even while the terminal is focused, as in kratos's
             // `useHotkey(toggleShortcut, ... setOpenScoped(!open))`.)
             window.focus(&self.composer.focus_handle(cx), cx);
         }
@@ -3636,7 +3636,7 @@ impl Shell {
         let current = settings::current(cx);
         self.settings.new_thread_composer_background = current.new_thread_composer_background;
         self.settings.new_thread_background_effect = current.new_thread_background_effect;
-        self.settings.open_web_links_in_zeron = current.open_web_links_in_zeron;
+        self.settings.open_web_links_in_kratos = current.open_web_links_in_kratos;
         self.settings.ui_font_family = current.ui_font_family;
         self.settings.ui_font_size = current.ui_font_size;
         self.settings.terminal_font_family = current.terminal_font_family;
@@ -3674,7 +3674,7 @@ impl Shell {
         }
     }
 
-    fn copy_zeron_conversation_link(&mut self, chat_id: &str, cx: &mut Context<Self>) {
+    fn copy_kratos_conversation_link(&mut self, chat_id: &str, cx: &mut Context<Self>) {
         let link = {
             let state = self.state.read(cx);
             crate::links::workspace_locator(
@@ -3682,11 +3682,11 @@ impl Shell {
                 state.auth.as_ref(),
                 state.local_device_id.as_deref(),
             )
-            .map(|workspace| crate::links::zeron_conversation_link(chat_id, &workspace))
+            .map(|workspace| crate::links::kratos_conversation_link(chat_id, &workspace))
         };
         if let Some(link) = link {
             cx.write_to_clipboard(ClipboardItem::new_string(link));
-            self.sidebar_notice = Some("Zeron conversation link copied".into());
+            self.sidebar_notice = Some("Kratos conversation link copied".into());
         } else {
             self.sidebar_notice = Some("Conversation link is not ready yet".into());
         }
@@ -4467,7 +4467,7 @@ impl Shell {
                     },
                     Err(err) => {
                         shell.runtime_change_error = Some(format!(
-                            "Could not stop the remote engine: {err}. Run `zeron daemon stop`, then quit and reopen Zeron."
+                            "Could not stop the remote engine: {err}. Run `kratos daemon stop`, then quit and reopen Kratos."
                         ).into());
                         cx.notify();
                     }
@@ -4616,7 +4616,7 @@ impl Shell {
     /// Evaluate a width tween at the frame time (see [`WidthTween`]).
     /// Mid-flight: eased 200ms lerp, and `motion_active` is flagged so render
     /// schedules the next animation frame. Finished, stale, absent, or under
-    /// reduced motion: exactly `target`. Honors `ZERON_MOTION_SCALE`.
+    /// reduced motion: exactly `target`. Honors `KRATOS_MOTION_SCALE`.
     fn eval_tween(&self, tween: Option<WidthTween>, target: f32) -> f32 {
         let Some(WidthTween { from, to, started }) = tween else {
             return target;
@@ -4738,11 +4738,11 @@ impl Shell {
     }
 
     /// The header's content row with the animated left inset — the native port
-    /// of zeron __root.tsx `transition-[padding-left] duration-200 ease-out` +
+    /// of kratos __root.tsx `transition-[padding-left] duration-200 ease-out` +
     /// `style={{ paddingLeft: headerInset }}`: on sidebar toggles (and macOS
     /// fullscreen flips) the SAME element's padding tweens, so the title
     /// glides to its new x-position. Route changes SNAP: the tween is killed
-    /// by every route transition (zeron remounts the keyed header variants —
+    /// by every route transition (kratos remounts the keyed header variants —
     /// instant swap, zero horizontal motion).
     /// Where unified-titlebar content (tabs / the settings label) starts: past
     /// the traffic lights + control cluster, riding the fullscreen inset tween.
@@ -4778,7 +4778,7 @@ impl Shell {
     }
 
     /// Make a titlebar strip drag the window — zed's platform-titlebar
-    /// pattern (zeron's `.drag` region): mark it a [`WindowControlArea::Drag`]
+    /// pattern (kratos's `.drag` region): mark it a [`WindowControlArea::Drag`]
     /// (macOS app-owned titlebar), hand the drag to the compositor once the
     /// pointer moves with the button down, and double-click zooms.
     fn titlebar_drag_region(
@@ -4863,7 +4863,7 @@ impl Shell {
     }
 
     /// The ONE top-left window-control cluster (sidebar toggle + back/forward —
-    /// zeron window-controls.tsx): rendered once, in a paint-only overlay layer
+    /// kratos window-controls.tsx): rendered once, in a paint-only overlay layer
     /// pinned at the window's top-left, ABOVE the sidebar and headers. The
     /// sidebar width animates *beneath* it, so the buttons keep their element
     /// identity and never move or remount on collapse/expand; only the
@@ -4996,7 +4996,7 @@ impl Shell {
         )
     }
 
-    /// Native Windows caption controls integrated into Zeron's unified
+    /// Native Windows caption controls integrated into Kratos's unified
     /// titlebar. `WindowControlArea` maps these hit targets to HTMINBUTTON,
     /// HTMAXBUTTON, and HTCLOSE, so Windows owns their behavior (including
     /// Snap Layouts) while GPUI renders the system Segoe caption glyphs.
@@ -5046,7 +5046,7 @@ impl Shell {
         )
     }
 
-    /// Which caption buttons zeron itself must draw on Linux: under
+    /// Which caption buttons kratos itself must draw on Linux: under
     /// client-side decorations (the Wayland default) nobody else will —
     /// without these the window has NO minimize/maximize/close at all.
     /// Server-side decorations (X11 WMs, KDE with SSD) already draw real
@@ -5107,7 +5107,7 @@ impl Shell {
     }
 
     /// Right padding titlebar content needs to clear the platform's caption
-    /// controls (native Windows cluster / zeron-drawn Linux buttons).
+    /// controls (native Windows cluster / kratos-drawn Linux buttons).
     pub(super) fn titlebar_right_pad(&self, base: f32) -> f32 {
         titlebar_right_padding(
             cfg!(target_os = "windows"),
@@ -5116,7 +5116,7 @@ impl Shell {
         )
     }
 
-    /// Zeron-drawn Linux caption controls, one overlay per populated side.
+    /// Kratos-drawn Linux caption controls, one overlay per populated side.
     /// Shell-level chrome like the Windows cluster: mounted at the root so
     /// they stay above the splash and every auth/org/error gate.
     fn render_linux_caption_controls(&self, window: &Window, cx: &App) -> Vec<AnyElement> {
@@ -5326,7 +5326,7 @@ impl Shell {
     }
 
     fn render_sidebar(&mut self, _cx: &mut Context<Self>) -> AnyElement {
-        // The sidebar is part of the resolved theme. A second fixed-Zeron
+        // The sidebar is part of the resolved theme. A second fixed-Kratos
         // palette here made imported families look split in half and froze
         // activity/glyph personality independently of the selected variant.
         let inner = self.sidebar_pane.clone().cached(
@@ -5348,7 +5348,7 @@ impl Shell {
             .into_any_element()
     }
 
-    /// Settings-mode sidebar (zeron settings-sidebar.tsx): window-control
+    /// Settings-mode sidebar (kratos settings-sidebar.tsx): window-control
     /// strip, "Settings" heading, icon section rows styled like session rows,
     /// and a Back row pinned to the bottom.
     fn render_settings_nav(
@@ -5442,7 +5442,7 @@ impl Shell {
                         ),
                     ),
             )
-            // Back pinned to the bottom (zeron settings-sidebar.tsx).
+            // Back pinned to the bottom (kratos settings-sidebar.tsx).
             .child(
                 div().px(px(Theme::SPACE_SM)).pb(px(12.0)).child(
                     div()
@@ -5460,7 +5460,7 @@ impl Shell {
                         .hover(|s| s.bg(theme.glass_hover()).text_color(theme.text))
                         .on_click(cx.listener(|this, _, _, cx| this.close_settings(cx)))
                         .child(
-                            // AltArrowLeft chevron (zeron settings-sidebar.tsx),
+                            // AltArrowLeft chevron (kratos settings-sidebar.tsx),
                             // not the straight history arrow.
                             icon(icons::ALT_ARROW_LEFT)
                                 .size(px(16.0))
@@ -5483,9 +5483,9 @@ impl Shell {
         time_ago: SharedString,
         space_name: SharedString,
         branch: Option<SharedString>,
-        change_request: Option<zeron_proto::ChangeRequestSummary>,
-        harness: Option<zeron_proto::HarnessId>,
-        status: zeron_proto::ChatIndicator,
+        change_request: Option<kratos_proto::ChangeRequestSummary>,
+        harness: Option<kratos_proto::HarnessId>,
+        status: kratos_proto::ChatIndicator,
         selected: bool,
         archived: bool,
         // This row's jump combo while the hint overlay is up. It takes the
@@ -5536,16 +5536,16 @@ impl Shell {
             Some("Queued")
         } else {
             match status {
-                zeron_proto::ChatIndicator::Working => Some("Working"),
-                zeron_proto::ChatIndicator::AwaitingInput => Some("Input"),
-                zeron_proto::ChatIndicator::Errored => Some("Failed"),
-                zeron_proto::ChatIndicator::Completed => Some("Done"),
-                zeron_proto::ChatIndicator::Idle => None,
+                kratos_proto::ChatIndicator::Working => Some("Working"),
+                kratos_proto::ChatIndicator::AwaitingInput => Some("Input"),
+                kratos_proto::ChatIndicator::Errored => Some("Failed"),
+                kratos_proto::ChatIndicator::Completed => Some("Done"),
+                kratos_proto::ChatIndicator::Idle => None,
             }
         };
         let shows_metadata = branch.is_some() || change_request.is_some();
         let queued = queued && !undelivered;
-        let working = status == zeron_proto::ChatIndicator::Working && !queued && !undelivered;
+        let working = status == kratos_proto::ChatIndicator::Working && !queued && !undelivered;
         let corner_body: AnyElement = if let Some(label) = jump_label {
             // The jump hint replaces the status/time corner while the modifier
             // is held, cut to the sidebar PR badge's exact cloth
@@ -5616,7 +5616,7 @@ impl Shell {
                     // Glyph slot: Working wears the preset's animated pixel
                     // glyph beside its label, Done wears the check, and the
                     // remaining statuses use a compact dot.
-                    let glyph: AnyElement = if status == zeron_proto::ChatIndicator::Completed {
+                    let glyph: AnyElement = if status == kratos_proto::ChatIndicator::Completed {
                         icon(icons::CHECK)
                             .size(px(11.0))
                             .flex_none()
@@ -5697,7 +5697,7 @@ impl Shell {
         let subline = theme.text_muted.opacity(0.5);
         let select_id = id.clone();
         let menu_id = id.clone();
-        // Hover fades over transition-colors (zeron session-row.tsx) — both
+        // Hover fades over transition-colors (kratos session-row.tsx) — both
         // the wash and the title brighten ride the same 150ms blend.
         let fade_key = format!("{row_id}-hover");
         let rest_bg = if selected {
@@ -5865,7 +5865,7 @@ impl Shell {
     /// reconnecting; an amber dot only when the OS says offline. The
     /// transport error belongs in logs, not the sidebar.
     fn render_connection_pill(&self, theme: &Theme, cx: &mut Context<Self>) -> Option<AnyElement> {
-        use zeron_proto::ConnectivityState as S;
+        use kratos_proto::ConnectivityState as S;
         let conn = self.state.read(cx).connectivity.clone();
         let (label, glyph): (SharedString, AnyElement) = match conn.state {
             S::Disabled | S::Connected => return None,
@@ -6124,7 +6124,7 @@ impl Shell {
     /// UpdateStatus stream reports a newer release. On a macOS bundle install
     /// it drives the whole flow — click to download, then click to restart into
     /// the staged bundle. Elsewhere (managed/source installs) it is advisory
-    /// (`zeron update`); click dismisses it for that version.
+    /// (`kratos update`); click dismisses it for that version.
     fn render_update_strip(&mut self, theme: &Theme, cx: &mut Context<Self>) -> Option<AnyElement> {
         let status = self.state.read(cx).update.clone()?;
         if !status.update_available {
@@ -6145,7 +6145,7 @@ impl Shell {
             }
         } else {
             (
-                format!("Update available — v{latest} · run `zeron update`").into(),
+                format!("Update available — v{latest} · run `kratos update`").into(),
                 true,
             )
         };
@@ -6204,15 +6204,15 @@ impl Shell {
         }
     }
 
-    /// Fetch the manifest and stage the new Zeron desktop bundle under the data dir
+    /// Fetch the manifest and stage the new Kratos desktop bundle under the data dir
     /// (tokio — reqwest); the strip flips to "restart to apply" when done.
     fn begin_update_download(&mut self, cx: &mut Context<Self>) {
-        let releases_url = zeron_update::DEFAULT_RELEASES_URL.to_string();
+        let releases_url = kratos_update::DEFAULT_RELEASES_URL.to_string();
         let data_dir = self.data_dir.clone();
         let install = self.install.clone();
         self.update_flow = UpdateFlow::Downloading;
         let download = Tokio::spawn(cx, async move {
-            let manifest = zeron_update::fetch_latest(&releases_url).await?;
+            let manifest = kratos_update::fetch_latest(&releases_url).await?;
             install
                 .stage_desktop(&releases_url, &manifest, &data_dir)
                 .await
@@ -6316,7 +6316,7 @@ impl Shell {
                 cx.notify();
             }))
             .child(
-                // Avatar: white circle, initial in near-black (zeron user-menu.tsx).
+                // Avatar: white circle, initial in near-black (kratos user-menu.tsx).
                 div()
                     .size(px(28.0))
                     .flex_none()
@@ -6473,7 +6473,7 @@ impl Shell {
         } else if remote_engine {
             "Stop daemon and quit"
         } else {
-            "Quit Zeron"
+            "Quit Kratos"
         };
 
         if self.sync_flow == SyncFlow::Enabling {
@@ -6545,9 +6545,9 @@ impl Shell {
                     div().mt(px(6.0)).child(popover::dialog_body(
                         &theme,
                         if remote_engine {
-                            "Zeron is using a background daemon. Stop it and quit Zeron, then reopen to start the synced workspace. Existing local sessions stay on this device and will not be uploaded."
+                            "Kratos is using a background daemon. Stop it and quit Kratos, then reopen to start the synced workspace. Existing local sessions stay on this device and will not be uploaded."
                         } else {
-                            "Quit and reopen Zeron to start the synced workspace. Existing local sessions stay on this device and will not be uploaded."
+                            "Quit and reopen Kratos to start the synced workspace. Existing local sessions stay on this device and will not be uploaded."
                         },
                     )),
                 )
@@ -6592,7 +6592,7 @@ impl Shell {
                 .child(
                     div().mt(px(6.0)).child(popover::dialog_body(
                         &theme,
-                        "Zeron will remove your credentials, close the synced workspace, and continue in local mode.",
+                        "Kratos will remove your credentials, close the synced workspace, and continue in local mode.",
                     )),
                 )
                 .child(
@@ -6858,7 +6858,7 @@ impl Shell {
                         .as_ref()
                         .and_then(|chat| chat.harness_session_id.as_deref())
                         .is_some_and(|id| !id.trim().is_empty());
-                    let zeron_id = chat_id.clone();
+                    let kratos_id = chat_id.clone();
                     let harness_id = chat_id.clone();
                     let session_chat_id = chat_id.clone();
                     menu.child(
@@ -6879,17 +6879,17 @@ impl Shell {
                     )
                     .child(popover::menu_separator())
                     .child(
-                        popover::menu_row(&theme, false, format!("chat-copy-zeron-{chat_id}"))
-                            .id("chat-copy-zeron")
+                        popover::menu_row(&theme, false, format!("chat-copy-kratos-{chat_id}"))
+                            .id("chat-copy-kratos")
                             .on_click(cx.listener(move |this, _, _, cx| {
-                                this.copy_zeron_conversation_link(&zeron_id, cx)
+                                this.copy_kratos_conversation_link(&kratos_id, cx)
                             }))
                             .child(
                                 icon(icons::COPY)
                                     .size(px(16.0))
                                     .text_color(theme.text_muted),
                             )
-                            .child(SharedString::from("Zeron conversation link")),
+                            .child(SharedString::from("Kratos conversation link")),
                     )
                     .when_some(harness_link, |menu, link| {
                         menu.child(
@@ -7281,7 +7281,7 @@ impl Shell {
                         .flex_col()
                         .items_center()
                         .child(
-                            icon(icons::ZERON_LOGO)
+                            icon(icons::KRATOS_LOGO)
                                 .w(px(41.9))
                                 .h(px(48.0))
                                 .text_color(theme.text.opacity(0.09)),
@@ -7724,7 +7724,7 @@ impl Shell {
         let state = self.state.read(cx);
 
         // Aligned with the composer column: centered, same max width, small
-        // inner gutter (zeron's `mx-auto h-6 max-w-3xl px-2`).
+        // inner gutter (kratos's `mx-auto h-6 max-w-3xl px-2`).
         let strip = div()
             .h(px(Theme::STATUS_STRIP_HEIGHT))
             .flex_none()
@@ -8057,7 +8057,7 @@ impl Shell {
             .items_center()
             .text_center()
             .child(
-                icon(icons::ZERON_LOGO)
+                icon(icons::KRATOS_LOGO)
                     .w(px(31.4))
                     .h(px(36.0))
                     .text_color(theme.text),
@@ -8078,7 +8078,7 @@ impl Shell {
                     .line_height(px(19.0))
                     .text_color(theme.text_muted)
                     .child(SharedString::from(
-                        "Zeron removed your credentials but could not finish closing the previous synced workspace. Retry before continuing in local mode.",
+                        "Kratos removed your credentials but could not finish closing the previous synced workspace. Retry before continuing in local mode.",
                     )),
             )
             .when_some(self.runtime_change_error.clone(), |card, error| {
@@ -8246,7 +8246,7 @@ impl Shell {
                         .read(cx)
                         .sub_transcript(&tab.doc_id)
                         .last()
-                        .is_some_and(|e| e.status == Some(zeron_doc::MessageStatus::Streaming))
+                        .is_some_and(|e| e.status == Some(kratos_doc::MessageStatus::Streaming))
                 }),
                 _ => false,
             };
@@ -8835,7 +8835,7 @@ impl Shell {
 
         let card = div().w(px(440.0)).p(px(32.0)).rounded(px(12.0)).border_1()
             .border_color(theme.border).bg(theme.surface_card).shadow_lg().flex().flex_col()
-            .child(icon(icons::ZERON_LOGO).w(px(24.4)).h(px(28.0)).text_color(theme.text))
+            .child(icon(icons::KRATOS_LOGO).w(px(24.4)).h(px(28.0)).text_color(theme.text))
             .child(div().mt(px(18.0)).text_size(crate::typography::ui_rems(18.0)).font_weight(gpui::FontWeight::SEMIBOLD).text_color(theme.text).child("Connect your devices"))
             .child(div().mt(px(6.0)).mb(px(20.0)).text_size(crate::typography::ui_rems(13.0)).line_height(px(19.0)).text_color(theme.text_muted)
                 .child("Private sync uses a Tailcat peer you control—no browser login or organization account."))
@@ -8915,7 +8915,7 @@ mod pairing_accessibility_tests {
                     EngineBootConfig {
                         data_dir: dir.path().into(),
                         ipc_port: 0,
-                        default_harness: zeron_proto::HarnessId::Mock,
+                        default_harness: kratos_proto::HarnessId::Mock,
                     },
                     cx,
                 );
@@ -8977,7 +8977,7 @@ mod pairing_accessibility_tests {
     }
 }
 
-/// The sign-in gate's faint grid backdrop (zeron styles.css `.bg-grid`):
+/// The sign-in gate's faint grid backdrop (kratos styles.css `.bg-grid`):
 /// 44px hairlines at white 3.5%, with the radial mask approximated by edge
 /// gradients back into the page background (gpui has no mask-image).
 fn grid_backdrop(theme: &Theme) -> AnyElement {
@@ -9066,7 +9066,7 @@ fn grid_backdrop(theme: &Theme) -> AnyElement {
         .into_any_element()
 }
 
-/// A size-6 icon button for the titlebar strip (zeron window-controls.tsx:
+/// A size-6 icon button for the titlebar strip (kratos window-controls.tsx:
 /// `grid size-6 place-items-center rounded-md text-muted-foreground`).
 fn window_control_button(
     id: &'static str,
@@ -9085,7 +9085,7 @@ fn window_control_button(
         .justify_center()
         .rounded(px(6.0))
         .cursor_pointer()
-        // zeron window-controls.tsx: `transition-colors` — the wash fades.
+        // kratos window-controls.tsx: `transition-colors` — the wash fades.
         .bg(motion::hover_blend(
             &fade_key,
             theme.glass_hover().opacity(0.0),
@@ -9117,7 +9117,7 @@ const WINDOWS_CAPTION_BUTTON_WIDTH: f32 = 36.0;
 const WINDOWS_CAPTION_WIDTH: f32 = WINDOWS_CAPTION_BUTTON_WIDTH * 3.0;
 
 /// Right padding for titlebar content: past the native Windows caption
-/// cluster, or past zeron's own Linux caption buttons (10px edge inset +
+/// cluster, or past kratos's own Linux caption buttons (10px edge inset +
 /// the button row) when the layout puts any on the right.
 fn titlebar_right_padding(is_windows: bool, linux_right_captions: usize, base: f32) -> f32 {
     base + if is_windows {
@@ -9171,7 +9171,7 @@ fn windows_caption_button(
         .child(glyph)
 }
 
-/// A Linux caption button in zeron's own cluster style (24px, rounded-6,
+/// A Linux caption button in kratos's own cluster style (24px, rounded-6,
 /// 16px linear icon). gpui's `WindowControlArea` hit-testing is inert on
 /// Linux, so unlike the Windows cluster these carry explicit click handlers
 /// (`minimize_window` / `zoom_window` / `remove_window`), the same calls
@@ -9219,7 +9219,7 @@ fn linux_caption_button(
         )
 }
 
-/// A titlebar history button (zeron window-controls.tsx): enabled it is a
+/// A titlebar history button (kratos window-controls.tsx): enabled it is a
 /// normal window-control button; disabled it dims to 35% opacity and ignores
 /// the pointer (`disabled:pointer-events-none disabled:opacity-35`).
 fn nav_history_button(
@@ -9249,7 +9249,7 @@ fn nav_history_button(
     window_control_button(id, icon_path, theme, on_click).into_any_element()
 }
 
-/// A size-7 icon button for the main-panel header (zeron __root.tsx:
+/// A size-7 icon button for the main-panel header (kratos __root.tsx:
 /// `grid size-7 place-items-center rounded-md text-muted-foreground`).
 fn header_icon_button(
     id: &'static str,
@@ -9268,7 +9268,7 @@ fn header_icon_button(
         .justify_center()
         .rounded(px(6.0))
         .cursor_pointer()
-        // zeron __root.tsx header buttons: `transition-colors`.
+        // kratos __root.tsx header buttons: `transition-colors`.
         .bg(motion::hover_blend(
             &fade_key,
             crate::theme::wash(0.0),
@@ -9484,7 +9484,7 @@ impl Render for Shell {
             .on_drag_move(cx.listener(Self::on_right_pane_drag))
             .on_drag_move(cx.listener(Self::on_terminal_drag))
             // The panel shortcuts are chat-scoped chrome: in Settings they are
-            // no-ops (zeron __root.tsx gates the hotkey on `!isSettings`, and
+            // no-ops (kratos __root.tsx gates the hotkey on `!isSettings`, and
             // the terminal panel is only mounted on session routes). The
             // sidebar toggle stays live everywhere, as in the original.
             .on_action(cx.listener(|this, _: &ToggleTerminal, window, cx| {
@@ -9597,7 +9597,7 @@ impl Render for Shell {
                             .update(cx, |s, cx| s.mark_chat_seen(&chat_id, cx));
                     }
                 }
-                // Capture knob: `ZERON_OPEN_DIALOG=model` pops the combined
+                // Capture knob: `KRATOS_OPEN_DIALOG=model` pops the combined
                 // harness/model menu (needs `window`, so it fires here rather
                 // than in `on_state_changed`).
                 if self.debug_dialog.as_deref() == Some("model") {
@@ -9666,7 +9666,7 @@ impl Render for Shell {
                 );
                 let main = self.render_main(window, main_content_width, transcript_width, cx);
                 // The Changes pane is chat-scoped chrome: the Settings route
-                // never renders it (zeron __root.tsx `!isSettings && activeChat`
+                // never renders it (kratos __root.tsx `!isSettings && activeChat`
                 // around the diff column) — the per-session open flags stay
                 // intact for the return trip.
                 let right_open = on_chat && self.right_pane_open(cx);
@@ -9722,7 +9722,7 @@ impl Render for Shell {
                     .overflow_hidden()
                     .child(main)
                     .into_any_element();
-                // The whole app page is one keyed `animate-in` entrance (zeron
+                // The whole app page is one keyed `animate-in` entrance (kratos
                 // App.tsx `<div key={phase} className="animate-in h-full">`):
                 // arriving from the splash or any gate fades the page in; the
                 // splash-out crossfades over it on boot.
@@ -10265,7 +10265,7 @@ mod tests {
         let handle = crate::state::EngineHandle::bootstrap(EngineBootConfig {
             data_dir: dir.path().to_path_buf(),
             ipc_port: port,
-            default_harness: zeron_proto::HarnessId::Mock,
+            default_harness: kratos_proto::HarnessId::Mock,
         })
         .await
         .unwrap();
@@ -10338,7 +10338,7 @@ mod tests {
     #[test]
     fn local_pairing_offers_the_in_place_switch() {
         let signed_in = AuthState::SignedIn {
-            user: zeron_proto::UserProfile {
+            user: kratos_proto::UserProfile {
                 id: "user-1".into(),
                 email: "peer@local".into(),
                 name: None,
@@ -10438,7 +10438,7 @@ mod tests {
     #[test]
     fn switch_lifecycle_survives_the_runtime_replacement_window() {
         let signed_in = AuthState::SignedIn {
-            user: zeron_proto::UserProfile {
+            user: kratos_proto::UserProfile {
                 id: "user-1".into(),
                 email: "user@example.com".into(),
                 name: None,
@@ -10464,7 +10464,7 @@ mod tests {
     #[test]
     fn synced_sign_out_blocks_every_viewport_and_cannot_switch_accounts() {
         let signed_in_as_another_user = AuthState::SignedIn {
-            user: zeron_proto::UserProfile {
+            user: kratos_proto::UserProfile {
                 id: "user-2".into(),
                 email: "other@example.com".into(),
                 name: None,
@@ -10502,8 +10502,8 @@ mod tests {
     }
 
     #[test]
-    fn titlebar_cluster_matches_zeron_window_controls() {
-        // zeron window-controls.tsx: `left: fullscreen ? 12 : 88` — the
+    fn titlebar_cluster_matches_kratos_window_controls() {
+        // kratos window-controls.tsx: `left: fullscreen ? 12 : 88` — the
         // cluster clears the {14,15} traffic lights, and reclaims the inset
         // when fullscreen hides them.
         assert_eq!(titlebar_cluster_start(false), 88.0);
@@ -10755,7 +10755,7 @@ mod tests {
         );
     }
 
-    // ---- per-session panel flags (§1.10/1.11 parity: zeron sessionPanels) ----
+    // ---- per-session panel flags (§1.10/1.11 parity: kratos sessionPanels) ----
 
     #[test]
     fn session_panels_default_closed_per_chat() {
@@ -10979,7 +10979,7 @@ mod tests {
     #[test]
     fn nav_push_truncates_the_forward_branch() {
         // a → b → c, back to a, then push d: the b/c branch is gone (browser
-        // semantics — zeron's memory history PUSH truncates entries ahead).
+        // semantics — kratos's memory history PUSH truncates entries ahead).
         let mut nav = NavHistory::new(chat("a"));
         nav.push(chat("b"));
         nav.push(chat("c"));
@@ -11057,7 +11057,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11125,7 +11125,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11222,7 +11222,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11231,13 +11231,13 @@ mod exit_regressions {
             .into_iter()
             .enumerate()
         {
-            let open_links_in_zeron = index % 2 == 0;
-            let terminal_family = if open_links_in_zeron {
+            let open_links_in_kratos = index % 2 == 0;
+            let terminal_family = if open_links_in_kratos {
                 crate::typography::UiFontFamily::System
             } else {
                 crate::typography::UiFontFamily::Geist
             };
-            let code_family = if open_links_in_zeron {
+            let code_family = if open_links_in_kratos {
                 crate::typography::UiFontFamily::Geist
             } else {
                 crate::typography::UiFontFamily::System
@@ -11252,7 +11252,7 @@ mod exit_regressions {
                     shell.schedule_save(cx);
                     settings::set_new_thread_background_effect(effect, cx);
                     settings::update(settings::SavePolicy::Immediate, cx, |settings| {
-                        settings.open_web_links_in_zeron = open_links_in_zeron;
+                        settings.open_web_links_in_kratos = open_links_in_kratos;
                         settings.terminal_font_family = terminal_family.clone();
                         settings.terminal_font_size = terminal_size;
                         settings.code_font_family = code_family.clone();
@@ -11265,7 +11265,7 @@ mod exit_regressions {
                         shell.schedule_save(cx);
                         let current = settings::current(cx);
                         assert_eq!(current.new_thread_background_effect, effect);
-                        assert_eq!(current.open_web_links_in_zeron, open_links_in_zeron);
+                        assert_eq!(current.open_web_links_in_kratos, open_links_in_kratos);
                         assert_eq!(current.terminal_font_family, terminal_family);
                         assert_eq!(current.terminal_font_size, terminal_size);
                         assert_eq!(current.code_font_family, code_family);
@@ -11274,7 +11274,7 @@ mod exit_regressions {
                     settings::flush(cx);
                     let loaded = settings::UiSettings::load(dir.path());
                     assert_eq!(loaded.new_thread_background_effect, effect);
-                    assert_eq!(loaded.open_web_links_in_zeron, open_links_in_zeron);
+                    assert_eq!(loaded.open_web_links_in_kratos, open_links_in_kratos);
                     assert_eq!(loaded.terminal_font_family, terminal_family);
                     assert_eq!(loaded.terminal_font_size, terminal_size);
                     assert_eq!(loaded.code_font_family, code_family);
@@ -11310,7 +11310,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11391,7 +11391,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11465,7 +11465,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11473,7 +11473,7 @@ mod exit_regressions {
         window
             .update(cx, |shell, _, cx| {
                 shell.state.update(cx, |state, _| {
-                    state.apply_spaces(vec![zeron_proto::Space {
+                    state.apply_spaces(vec![kratos_proto::Space {
                         id: "repo".into(),
                         device_id: "local".into(),
                         path: "/repo".into(),
@@ -11526,7 +11526,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11563,7 +11563,7 @@ mod exit_regressions {
                 shell.activate_session_link(&activation, window, cx);
                 assert_eq!(shell.browsers.len(), 2);
                 settings::update(settings::SavePolicy::Immediate, cx, |settings| {
-                    settings.open_web_links_in_zeron = false;
+                    settings.open_web_links_in_kratos = false;
                 });
                 assert_eq!(
                     shell.activate_session_link(&activation, window, cx),
@@ -11650,7 +11650,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11742,7 +11742,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11816,7 +11816,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -11874,7 +11874,7 @@ mod exit_regressions {
                 EngineBootConfig {
                     data_dir: dir.path().into(),
                     ipc_port: 0,
-                    default_harness: zeron_proto::HarnessId::Mock,
+                    default_harness: kratos_proto::HarnessId::Mock,
                 },
                 cx,
             )
@@ -12047,7 +12047,7 @@ mod right_tab_mouse_regressions {
                     EngineBootConfig {
                         data_dir: dir.path().into(),
                         ipc_port: 0,
-                        default_harness: zeron_proto::HarnessId::Mock,
+                        default_harness: kratos_proto::HarnessId::Mock,
                     },
                     cx,
                 );

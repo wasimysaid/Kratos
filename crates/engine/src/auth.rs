@@ -71,11 +71,11 @@ impl AuthState {
         None
     }
 
-    pub fn to_proto(&self) -> zeron_proto::AuthState {
+    pub fn to_proto(&self) -> kratos_proto::AuthState {
         match self {
-            Self::SignedOut => zeron_proto::AuthState::SignedOut,
-            Self::SignedIn { user, .. } => zeron_proto::AuthState::SignedIn {
-                user: zeron_proto::UserProfile {
+            Self::SignedOut => kratos_proto::AuthState::SignedOut,
+            Self::SignedIn { user, .. } => kratos_proto::AuthState::SignedIn {
+                user: kratos_proto::UserProfile {
                     id: user.id.clone(),
                     email: user.email.clone(),
                     name: user.name.clone(),
@@ -763,7 +763,7 @@ impl Auth {
         // Adapter recovery is also network-path recovery for every room
         // supervisor. Wake all parked backoffs immediately; token watchers
         // alone can miss a refresh completed before their first failed dial.
-        zeron_sync::wake::set_path_online(true);
+        kratos_sync::wake::set_path_online(true);
         Ok(token.token)
     }
 
@@ -902,7 +902,7 @@ impl Auth {
 }
 
 #[async_trait::async_trait]
-impl zeron_rpc::TokenSource for Auth {
+impl kratos_rpc::TokenSource for Auth {
     async fn token(&self) -> Option<String> {
         self.access_token().await
     }
@@ -913,7 +913,7 @@ impl zeron_rpc::TokenSource for Auth {
 }
 
 #[async_trait::async_trait]
-impl zeron_preview::signaling::TokenSource for Auth {
+impl kratos_preview::signaling::TokenSource for Auth {
     async fn token(&self) -> Option<String> {
         self.access_token().await
     }

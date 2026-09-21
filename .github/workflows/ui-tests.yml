@@ -48,14 +48,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: OpenCode protocol and permission regressions
         run: |
-          cargo test --locked -p zeron-harness --lib opencode::
-          cargo test --locked -p zeron-harness --test opencode
+          cargo test --locked -p kratos-harness --lib opencode::
+          cargo test --locked -p kratos-harness --test opencode
       - name: Durable session publication and recovery
         run: |
-          cargo test --locked -p zeron-sync --lib
-          cargo test --locked -p zeron-engine --lib --test session_publication --test restart_resume --test codex_subagents --test local_profiles
+          cargo test --locked -p kratos-sync --lib
+          cargo test --locked -p kratos-engine --lib --test session_publication --test restart_resume --test codex_subagents --test local_profiles
       - name: Agent availability and case-sensitive executable discovery
-        run: cargo test --locked -p zeron-harness --lib --test acp --test claude_availability
+        run: cargo test --locked -p kratos-harness --lib --test acp --test claude_availability
 
   ui-tests:
     runs-on: ubuntu-24.04
@@ -75,7 +75,7 @@ jobs:
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - name: UI and headless layout regressions
-        run: cargo test --release --locked -p zeron-ui --lib -- --test-threads=1
+        run: cargo test --release --locked -p kratos-ui --lib -- --test-threads=1
 
   macos-frame-recovery:
     runs-on: macos-latest
@@ -99,14 +99,14 @@ jobs:
             .
             frame-source-tests
       - name: Check macOS application
-        run: cargo check --release --locked -p zeron
+        run: cargo check --release --locked -p kratos
       - name: Native diff font geometry regression
-        run: cargo test --release --locked -p zeron-ui --lib native_diff_font_geometry -- --test-threads=1
+        run: cargo test --release --locked -p kratos-ui --lib native_diff_font_geometry -- --test-threads=1
       - name: Native notification click regressions
         run: |
-          cargo test --release --locked -p zeron-ui --lib notify::tests:: -- --test-threads=1
+          cargo test --release --locked -p kratos-ui --lib notify::tests:: -- --test-threads=1
       - name: Build native browser fixture
-        run: cargo build --release --locked -p zeron-ui --example browser-fixture --example preview-fixture --features browser-fixture
+        run: cargo build --release --locked -p kratos-ui --example browser-fixture --example preview-fixture --features browser-fixture
       - name: Native browser regression and screenshots
         timeout-minutes: 3
         env:
@@ -129,7 +129,7 @@ jobs:
       - name: Project discovery, stable URLs and HMR in native WebKit
         timeout-minutes: 3
         env:
-          ZERON_PREVIEW_AUTO_OPEN: 1
+          KRATOS_PREVIEW_AUTO_OPEN: 1
         run: |
           VITE_BINARY="$GITHUB_WORKSPACE/scripts/fixtures/preview-server/node_modules/vite/bin/vite.js" bash scripts/run-macos-browser-fixture.sh target/release/examples/preview-fixture "$RUNNER_TEMP/preview-captures"
           test -f "$RUNNER_TEMP/preview-captures/result.txt"
@@ -180,23 +180,23 @@ jobs:
           DERIVED_DATA="$RUNNER_TEMP/ios-derived-data"
           CI_ENTITLEMENTS="$GITHUB_WORKSPACE/apps/ios/CI/Simulator.entitlements"
           # Let Xcode sign the host and embedded XCTest bundle as one coherent
-          # tree. Re-signing only Zeron.app after build-for-testing invalidates
+          # tree. Re-signing only Kratos.app after build-for-testing invalidates
           # the launch contract between the host and its nested test bundle.
           EXPECTED_TEAM_ID="5XY3M483YQ"
-          EXPECTED_APP_ID="$EXPECTED_TEAM_ID.sh.zeron.ios"
+          EXPECTED_APP_ID="$EXPECTED_TEAM_ID.sh.kratos.ios"
           SIGNING_ARGS=(
             CODE_SIGN_IDENTITY="-"
             CODE_SIGN_STYLE=Manual
             CODE_SIGNING_ALLOWED=YES
             CODE_SIGNING_REQUIRED=NO
           )
-          xcodebuild -project Zeron.xcodeproj -scheme Zeron \
+          xcodebuild -project Kratos.xcodeproj -scheme Kratos \
             -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" \
             -derivedDataPath "$DERIVED_DATA" \
-            -only-testing:ZeronTests "${SIGNING_ARGS[@]}" build-for-testing
+            -only-testing:KratosTests "${SIGNING_ARGS[@]}" build-for-testing
 
-          APP="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Zeron.app"
-          SIGNED_ENTITLEMENTS="$RUNNER_TEMP/zeron-simulator-entitlements.plist"
+          APP="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Kratos.app"
+          SIGNED_ENTITLEMENTS="$RUNNER_TEMP/kratos-simulator-entitlements.plist"
           codesign --verify --deep --strict --verbose=2 "$APP"
           codesign --display --entitlements - --xml "$APP" > "$SIGNED_ENTITLEMENTS"
           test "$(plutil -extract application-identifier raw "$SIGNED_ENTITLEMENTS")" = "$EXPECTED_APP_ID"
@@ -204,11 +204,11 @@ jobs:
           test "$(plutil -extract get-task-allow raw "$SIGNED_ENTITLEMENTS")" = "true"
           test "$(plutil -extract keychain-access-groups.0 raw "$SIGNED_ENTITLEMENTS")" = "$EXPECTED_APP_ID"
 
-          xcodebuild -project Zeron.xcodeproj -scheme Zeron \
+          xcodebuild -project Kratos.xcodeproj -scheme Kratos \
             -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" \
             -derivedDataPath "$DERIVED_DATA" \
             -resultBundlePath "$RUNNER_TEMP/ios-tests.xcresult" \
-            -only-testing:ZeronTests test-without-building
+            -only-testing:KratosTests test-without-building
       - name: Upload iOS test results
         if: always()
         uses: actions/upload-artifact@v4
@@ -236,7 +236,7 @@ jobs:
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - name: Build browser fixture
-        run: cargo build --release --locked -p zeron-ui --example browser-fixture --features browser-fixture
+        run: cargo build --release --locked -p kratos-ui --example browser-fixture --features browser-fixture
       - name: X11 and Wayland browser regressions
         timeout-minutes: 5
         env:

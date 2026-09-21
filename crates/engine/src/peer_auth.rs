@@ -23,8 +23,8 @@ use sha2::{Digest, Sha256};
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-const REDEEM_DOMAIN: &[u8] = b"zeron.peer-auth.invite-redeem.v1\0";
-const AUTH_DOMAIN: &[u8] = b"zeron.peer-auth.challenge.v1\0";
+const REDEEM_DOMAIN: &[u8] = b"kratos.peer-auth.invite-redeem.v1\0";
+const AUTH_DOMAIN: &[u8] = b"kratos.peer-auth.challenge.v1\0";
 const IDENTITY_VERSION: u8 = 1;
 const MAX_JSON_BYTES: usize = 16 * 1024;
 const MAX_NAME_BYTES: usize = 128;
@@ -797,7 +797,7 @@ pub fn router(store: AuthStore) -> Router {
 }
 
 /// Middleware for protected peer routes. A valid bearer is converted to the
-/// principal type consumed by `zeron_sync::peer` handlers.
+/// principal type consumed by `kratos_sync::peer` handlers.
 pub async fn require_peer_principal(
     State(store): State<AuthStore>,
     mut request: Request,
@@ -808,7 +808,7 @@ pub async fn require_peer_principal(
         Ok(principal) => {
             request
                 .extensions_mut()
-                .insert(zeron_sync::peer::PeerPrincipal {
+                .insert(kratos_sync::peer::PeerPrincipal {
                     profile_id: principal.profile_id,
                     device_id: principal.device_id,
                 });

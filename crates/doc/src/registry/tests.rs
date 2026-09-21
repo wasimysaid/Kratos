@@ -3,7 +3,7 @@
 //! `workspace.rs` so the drop-in claim is tested, not asserted.
 
 use super::*;
-use zeron_proto::{GoalPhase, GoalState, HarnessId, SandboxLevel, SessionStatus};
+use kratos_proto::{GoalPhase, GoalState, HarnessId, SandboxLevel, SessionStatus};
 
 fn ts(ms: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_millis(ms).unwrap_or(DateTime::UNIX_EPOCH)
@@ -348,7 +348,7 @@ fn server_round(
 fn rows_round_trip_and_upsert_refreshes() {
     let mut doc = RegistryDoc::new("dev-a");
     let mut device = device("dev-a", "laptop");
-    device.capabilities = vec![zeron_proto::capabilities::MESSAGE_QUEUE_V1.into()];
+    device.capabilities = vec![kratos_proto::capabilities::MESSAGE_QUEUE_V1.into()];
     doc.upsert_device(&device).unwrap();
     doc.upsert_chat(&chat("chat-1", "dev-a")).unwrap();
     let mut live = session("chat-1", "dev-a", SessionStatus::Working);

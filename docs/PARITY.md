@@ -37,13 +37,13 @@ not built yet).
 | DataRpc watches + QueueCommand | done | — |
 | Mutate ops | partial | createChat/renameChat/setChatArchived/deleteChat/renameDevice done; markChatSeen accepted as a no-op (unseen markers UI-local); `SetChatConfig` exists on the doc layer but is not yet exposed as a Mutate op. |
 | AuthRpc | done | IPC-only `AuthStatus`, peer initialization/pairing/invitations, trusted-device list/revoke/status, and disconnect. Pairing state becomes active only after engine restart. |
-| Wire types | done | `zeron-proto`: AgentEvent, ToolCall kinds, models/options, entities, AuthState. |
+| Wire types | done | `kratos-proto`: AgentEvent, ToolCall kinds, models/options, entities, AuthState. |
 
 ## §3 Backend engine
 
 | Item | Status | Notes |
 | --- | --- | --- |
-| 3.1 Lifecycle | partial | Profile-scoped device registration, ephemeral presence, stale-session recovery, host-only doc executor with steer→new-turn fallback, and single-instance data-dir lock. `zeron peer init` / `zeron pair` update saved trust while the engine is stopped; daemon install/start/stop/restart/status/uninstall manages launchd or systemd user units. Gaps: login-shell PATH capture for the headed app, crash shield, parent-PID watchdog. |
+| 3.1 Lifecycle | partial | Profile-scoped device registration, ephemeral presence, stale-session recovery, host-only doc executor with steer→new-turn fallback, and single-instance data-dir lock. `kratos peer init` / `kratos pair` update saved trust while the engine is stopped; daemon install/start/stop/restart/status/uninstall manages launchd or systemd user units. Gaps: login-shell PATH capture for the headed app, crash shield, parent-PID watchdog. |
 | 3.2 Sessions engine | partial | Run journal on disk with crash recovery (aborted stamps), steering mailbox at step boundaries, doc hooks at boundaries, streamed part folding at STREAM_COMMIT_MS. Gaps: idle reaper + 10-min stall watchdog for persistent harness sessions. |
 | 3.3 Session-docs host | done | SQLite snapshots + processed-command ledger, mark-before-execute, durable peer join per open chat, diff sidecar publish, and cold-chat command delivery through durable nudges. Gap (minor): no boot-time warm-open of recent chats (14d/30). |
 | 3.4 Terminals | done | PTYs, 1MB bounded replay + `afterSeq` resume, 32 max, exited 30-min TTL, live shells survive detach. |

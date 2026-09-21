@@ -18,7 +18,7 @@ use std::task::Poll;
 
 use serde_json::{Map, Value, json};
 use tokio::sync::oneshot;
-use zeron_proto::{UserInputAnswer, UserInputQuestion};
+use kratos_proto::{UserInputAnswer, UserInputQuestion};
 
 use crate::jsonrpc::RpcClient;
 
@@ -909,7 +909,7 @@ mod tests {
     // evidence portable and independent of Python or a paid/model-backed agent.
     #[test]
     fn rpc_peer() {
-        if std::env::var_os("ZERON_ELICITATION_RPC_PEER").is_none() {
+        if std::env::var_os("KRATOS_ELICITATION_RPC_PEER").is_none() {
             return;
         }
         use std::io::{BufRead, Write};
@@ -947,7 +947,7 @@ mod tests {
                 "acp::elicitation::tests::rpc_peer",
                 "--nocapture",
             ])
-            .env("ZERON_ELICITATION_RPC_PEER", "1")
+            .env("KRATOS_ELICITATION_RPC_PEER", "1")
             .stdin(crate::process::Stdio::piped())
             .stdout(crate::process::Stdio::piped())
             .stderr(crate::process::Stdio::piped())

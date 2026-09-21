@@ -17,7 +17,7 @@ use peer_auth::{AuthStore, DeviceIdentity, Principal};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::tungstenite::{Message, client::IntoClientRequest};
 use tokio_util::sync::CancellationToken;
-use zeron_preview::{
+use kratos_preview::{
     catalog::Catalog,
     discovery::Listener,
     mux::{self, BoxIo, Connector},
@@ -25,7 +25,7 @@ use zeron_preview::{
     proxy::{self, Router as PreviewRouter},
     signaling::{self, Config, TokenSource},
 };
-use zeron_sync::peer::preview::PreviewState;
+use kratos_sync::peer::preview::PreviewState;
 
 struct PeerServer {
     base: String,
@@ -41,7 +41,7 @@ impl Drop for PeerServer {
 }
 
 async fn serve_peer(auth: AuthStore, previews: PreviewState) -> PeerServer {
-    let protected = zeron_sync::peer::preview::router(previews.clone()).layer(
+    let protected = kratos_sync::peer::preview::router(previews.clone()).layer(
         middleware::from_fn_with_state(auth.clone(), peer_auth::require_peer_principal),
     );
     let app = peer_auth::router(auth.clone()).merge(protected);
@@ -130,7 +130,7 @@ fn advertise(catalog: &Catalog, root: &str, address: std::net::SocketAddr, pid: 
                 args: vec!["node".into(), "vite".into()],
                 started_at: pid as u64,
                 address,
-                zeron_owned: true,
+                kratos_owned: true,
             },
         )])
         .unwrap();

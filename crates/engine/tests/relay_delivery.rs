@@ -34,14 +34,14 @@ use tokio_tungstenite::tungstenite::handshake::server::{
     Request as WsRequest, Response as WsResponse,
 };
 
-use zeron_doc::{MessageRole, MessageStatus, SessionCommandPayload};
-use zeron_engine::{EdgeConfig, EngineCore, HarnessRegistry};
-use zeron_harness::{Harness, HarnessError, RunControls};
-use zeron_proto::{
+use kratos_doc::{MessageRole, MessageStatus, SessionCommandPayload};
+use kratos_engine::{EdgeConfig, EngineCore, HarnessRegistry};
+use kratos_harness::{Harness, HarnessError, RunControls};
+use kratos_proto::{
     AgentEvent, Device, DoneStatus, HarnessId, Model, ReasoningLevel, RunRequest, SandboxLevel,
     SteeringMode,
 };
-use zeron_rpc::{
+use kratos_rpc::{
     DeviceFrameHeader, LinkCache, LinkCacheConfig, StaticToken, decode_device_frame,
     encode_device_frame, methods,
 };
@@ -370,9 +370,9 @@ async fn rows_dark_command_delivers_over_the_peer_relay_exactly_once() {
         last_seen_at: Some(chrono::Utc::now()),
         created_at: None,
         version: Some("0.2.12".into()),
-        capabilities: zeron_proto::capabilities::current(),
+        capabilities: kratos_proto::capabilities::current(),
     });
-    let client_a = zeron_rpc::memory_client(core_a.rpc_service());
+    let client_a = kratos_rpc::memory_client(core_a.rpc_service());
     client_a
         .call(
             methods::MUTATE,
@@ -495,7 +495,7 @@ async fn sender_restarts_before_and_during_custody_upload_then_recovers_once() {
         last_seen_at: Some(chrono::Utc::now()),
         created_at: None,
         version: Some("0.2.12".into()),
-        capabilities: zeron_proto::capabilities::current(),
+        capabilities: kratos_proto::capabilities::current(),
     });
     core_a
         .workspace
@@ -514,7 +514,7 @@ async fn sender_restarts_before_and_during_custody_upload_then_recovers_once() {
         .uploads
         .commit("restart-upload", "proof.png")
         .expect("commit local attachment");
-    let pending = zeron_engine::uploads::pending_ref("restart-upload", "proof.png");
+    let pending = kratos_engine::uploads::pending_ref("restart-upload", "proof.png");
     core_a
         .doc_host
         .queue_command_with_transfers(
@@ -535,7 +535,7 @@ async fn sender_restarts_before_and_during_custody_upload_then_recovers_once() {
                 },
                 message_id: "msg-restart-custody".into(),
             },
-            vec![zeron_engine::uploads::AttachmentTransfer {
+            vec![kratos_engine::uploads::AttachmentTransfer {
                 upload_id: "restart-upload".into(),
                 file_name: "proof.png".into(),
             }],

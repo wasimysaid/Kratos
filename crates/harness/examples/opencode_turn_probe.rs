@@ -3,14 +3,14 @@
 //! Completed turn with text. Arg 1 = executable (default: PATH resolution),
 //! arg 2 = model (`provider/model`), arg 3 = prompt.
 //!
-//!     cargo run -p zeron-harness --example opencode_turn_probe -- \
+//!     cargo run -p kratos-harness --example opencode_turn_probe -- \
 //!         ~/.opencode/bin/opencode opencode/muse-spark-1.3-contributor-free \
 //!         "Read /tmp/note.txt and reply with its secret word."
 
 use futures::StreamExt;
 use tokio::sync::mpsc;
-use zeron_harness::{CancellationToken, Harness, OpencodeHarness, RunControls};
-use zeron_proto::{AgentEvent, RunRequest, SandboxLevel};
+use kratos_harness::{CancellationToken, Harness, OpencodeHarness, RunControls};
+use kratos_proto::{AgentEvent, RunRequest, SandboxLevel};
 
 #[tokio::main]
 async fn main() {
@@ -91,7 +91,7 @@ async fn main() {
     };
     eprintln!("--- done: {status:?} text={text:?} tools={tools}");
     match status {
-        Some(zeron_proto::DoneStatus::Completed) if !text.trim().is_empty() => {}
+        Some(kratos_proto::DoneStatus::Completed) if !text.trim().is_empty() => {}
         _ => std::process::exit(1),
     }
 }

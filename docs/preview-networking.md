@@ -20,7 +20,7 @@ wins. Unrelated listeners and non-HTTP services are excluded. HTTP probes are
 bounded and run every two seconds, using HEAD and accepting valid HTTP status
 responses (including authentication and application errors).
 
-Zeron terminal/task/agent descendants are marked as Zeron-owned. Framework
+Kratos terminal/task/agent descendants are marked as Kratos-owned. Framework
 commands identify Vite, Next.js, Astro, Miniflare and Node servers; otherwise the
 list uses a generic HTTP label. Before a local backend connection, the daemon
 rechecks the listener's process identity and cwd to reject stale port reuse.
@@ -76,7 +76,7 @@ opaque preview frames, and prevents clients from choosing another profile or
 forging a sender. Catalog presence has a heartbeat lease; disconnect and
 revocation remove advertised routes and active peer multiplexers.
 
-Tailcat protects the private HTTP/WebSocket path to the peer. Zeron's application
+Tailcat protects the private HTTP/WebSocket path to the peer. Kratos's application
 authorization, target assignment, frame bounds, flow control, and service-ID
 containment remain mandatory above that transport. A relay connection is opened
 lazily when a remote preview is requested. Local previews remain independent of
@@ -84,13 +84,13 @@ peer availability. macOS and Linux currently provide process discovery.
 
 ## Validation
 
-`cargo test --locked -p zeron-preview` covers real process/cwd isolation, non-HTTP
+`cargo test --locked -p kratos-preview` covers real process/cwd isolation, non-HTTP
 exclusion, live disappearance, persistent aliases, port changes, concurrent
 streams, slow readers, cancellation, large bodies, streaming HTTP headers,
 redirects, WebSocket traffic, bounded peer envelopes, and authenticated catalog
 routing through a local Rust peer fixture.
 
-Build `cargo build -p zeron-ui --example preview-fixture --features browser-fixture`.
+Build `cargo build -p kratos-ui --example preview-fixture --features browser-fixture`.
 Run the fixture with an output directory, an available display and `VITE_BINARY`
 pointing to an installed `vite/bin/vite.js`. It starts real Vite/API processes in
 an isolated project, discovers them through daemon RPC and waits for a native

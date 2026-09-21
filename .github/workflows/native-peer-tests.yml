@@ -52,9 +52,9 @@ jobs:
         run: rustup show active-toolchain || rustup toolchain install
       - uses: Swatinem/rust-cache@v2
       - name: Durable sync, restart and attachment custody
-        run: cargo test --locked -p zeron-sync --test peer_clients --test peer_attachments --test peer_http
+        run: cargo test --locked -p kratos-sync --test peer_clients --test peer_attachments --test peer_http
       - name: Peer authorization, backup/restore and engine recovery
-        run: cargo test --locked -p zeron-engine --test peer_auth --test peer_backup --test peer_preservation --test queued_attachments --test relay_delivery
+        run: cargo test --locked -p kratos-engine --test peer_auth --test peer_backup --test peer_preservation --test queued_attachments --test relay_delivery
       - name: Managed authentication and concurrent re-pairing
         if: runner.os == 'macOS'
-        run: cargo test --locked -p zeron-engine --test auth
+        run: cargo test --locked -p kratos-engine --test auth

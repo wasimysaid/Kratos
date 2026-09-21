@@ -1,12 +1,12 @@
 [package]
-name = "zeron-sync"
+name = "kratos-sync"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
 
 [dependencies]
-zeron-doc.workspace = true
+kratos-doc.workspace = true
 loro.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -34,7 +34,7 @@ mock-server = []
 [dev-dependencies]
 chrono.workspace = true
 reqwest.workspace = true
-zeron-proto.workspace = true
+kratos-proto.workspace = true
 tempfile.workspace = true
 # `start_paused` virtual-clock tests (the 2026-07-30 sync-stall regressions).
 tokio = { workspace = true, features = ["test-util"] }

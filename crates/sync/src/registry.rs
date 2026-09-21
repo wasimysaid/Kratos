@@ -4,7 +4,7 @@
 //! reconnect with exponential backoff.
 //!
 //! The client owns no row semantics: everything applies through the shared
-//! [`zeron_doc::RegistryDoc`] under a lock. Wire frames are stable JSON text
+//! [`kratos_doc::RegistryDoc`] under a lock. Wire frames are stable JSON text
 //! shared with the durable Rust peer.
 //!
 //! Liveness discipline is inherited from `room.rs` and its incidents: the
@@ -25,7 +25,7 @@ use tokio::sync::{broadcast, mpsc, oneshot, watch};
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-use zeron_doc::{PendingBatch, RegistryDoc, RegistryRow, StateOutcome};
+use kratos_doc::{PendingBatch, RegistryDoc, RegistryRow, StateOutcome};
 
 use crate::types::{RoomStatsSnapshot, StaticUrl, SyncError, UrlProvider};
 
@@ -99,7 +99,7 @@ enum ClientFrame<'a> {
     },
     Push {
         batch: &'a str,
-        ops: &'a [zeron_doc::RowOp],
+        ops: &'a [kratos_doc::RowOp],
     },
     Presence {
         at: i64,
@@ -238,7 +238,7 @@ async fn pump(
     }
 }
 
-// ── stats (RoomStatsSnapshot-compatible so SyncStatus/`zeron sync` render it) ─
+// ── stats (RoomStatsSnapshot-compatible so SyncStatus/`kratos sync` render it) ─
 
 #[derive(Default)]
 struct Stats {

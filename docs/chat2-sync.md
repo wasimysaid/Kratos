@@ -149,7 +149,7 @@ root).
 
 Estimate: 4–5 days.
 
-**C4. iOS** (`apps/ios/Zeron/Sync/`): `ChatRoomClient.swift` cloned from
+**C4. iOS** (`apps/ios/Kratos/Sync/`): `ChatRoomClient.swift` cloned from
 `RegistryClient.swift`; delete `LoroProtocol.swift` once s2 dies. Shared framing test
 vectors across Rust/TS/Swift (registry precedent). Estimate: 3–4 days, can trail
 desktop by a release.
@@ -214,7 +214,7 @@ explicit request; the real healing is M1.
 
 ## Observability / acceptance
 
-- `zeron sync` gains per-chat `cursor / headSeq / floorLag / pendingPushes`.
+- `kratos sync` gains per-chat `cursor / headSeq / floorLag / pendingPushes`.
 - Alert-shaped stat: any room with `headSeq - checkpointSeq` bytes > 2 MB or
   checkpoint age > 7 days (the passive failure mode this design trades into — make it
   visible from day one; silent truncation of the old wedge class must not become

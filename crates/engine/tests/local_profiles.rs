@@ -2,7 +2,7 @@
 
 use std::path::Path;
 use std::sync::{Arc, Barrier};
-use zeron_engine::{
+use kratos_engine::{
     AuthState, Engine, EngineConfig, EngineCore, EngineProfile, HarnessId, WorkspaceScope,
     default_registry,
 };
@@ -313,7 +313,7 @@ async fn legacy_workos_session_is_never_an_implicit_profile_authority() {
 }
 #[tokio::test]
 async fn removed_local_import_rpc_names_are_unknown() {
-    use zeron_rpc::{RpcError, RpcService};
+    use kratos_rpc::{RpcError, RpcService};
 
     let dir = tempfile::tempdir().expect("tempdir");
     let core = assemble(EngineProfile::local(dir.path()).expect("local profile"));

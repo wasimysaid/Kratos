@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use rusqlite::{Connection, OpenFlags, params};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use zeron_sync::peer::PeerStore;
+use kratos_sync::peer::PeerStore;
 
 const FORMAT_VERSION: u32 = 1;
 const MAX_SECRET_BYTES: u64 = 1024 * 1024;
@@ -210,7 +210,7 @@ pub fn verify_generation(generation: &Path) -> Result<BackupManifest, BackupErro
     Ok(manifest)
 }
 
-/// Restore into an absent or empty data root. The caller must stop every Zeron
+/// Restore into an absent or empty data root. The caller must stop every Kratos
 /// process using either source or destination before invoking this function.
 pub fn restore_generation(
     generation: &Path,

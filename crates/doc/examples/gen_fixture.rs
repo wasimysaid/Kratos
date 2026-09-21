@@ -1,12 +1,12 @@
 //! Generates a session-doc snapshot fixture for native/mobile compatibility checks.
-//! Usage: `cargo run -p zeron-doc --example gen_fixture -- <out>`
+//! Usage: `cargo run -p kratos-doc --example gen_fixture -- <out>`
 
-use zeron_doc::{
+use kratos_doc::{
     MessagePart, MessageRole, MessageStatus, SegmentWriter, SessionCommandEntry,
     SessionCommandPayload, SessionCommandStatus, SessionDoc, SessionMessageEntry,
     fold_event_into_parts,
 };
-use zeron_proto::{AgentEvent, ToolCall};
+use kratos_proto::{AgentEvent, ToolCall};
 
 fn main() {
     let out = std::env::args()

@@ -10,7 +10,7 @@ use axum::{
 use reqwest::StatusCode;
 use sha2::{Digest as _, Sha256};
 use tempfile::TempDir;
-use zeron_sync::peer::{PeerPrincipal, PeerStore, router};
+use kratos_sync::peer::{PeerPrincipal, PeerStore, router};
 
 async fn principal(mut req: Request<Body>, next: Next) -> Response {
     let profile = req.headers()["x-profile"].to_str().unwrap().to_owned();

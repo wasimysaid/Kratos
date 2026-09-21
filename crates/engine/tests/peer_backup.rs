@@ -1,12 +1,12 @@
 use std::fs;
 
 use rusqlite::{Connection, params};
-use zeron_engine::peer_auth::{AuthStore, DeviceIdentity};
-use zeron_engine::peer_runtime::backup::{
+use kratos_engine::peer_auth::{AuthStore, DeviceIdentity};
+use kratos_engine::peer_runtime::backup::{
     BackupError, TRUST_ROLLBACK_WARNING, create_generation, publish_directory, restore_generation,
     verify_generation,
 };
-use zeron_sync::peer::PeerStore;
+use kratos_sync::peer::PeerStore;
 
 fn seed_host(root: &std::path::Path) -> (AuthStore, DeviceIdentity, String, String, PeerStore) {
     fs::create_dir_all(root.join("peer")).unwrap();

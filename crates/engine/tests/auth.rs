@@ -3,11 +3,11 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
-use zeron_engine::{
+use kratos_engine::{
     Auth, AuthConfig, AuthState, Engine, EngineConfig, HarnessId, PairingInvitation, WorkspaceScope,
 };
 
-use zeron_engine::peer_runtime::backup::verify_generation;
+use kratos_engine::peer_runtime::backup::verify_generation;
 
 fn auth_config(data_dir: &Path, adapter: &Path) -> AuthConfig {
     let mut config = AuthConfig::new(data_dir);
@@ -29,7 +29,7 @@ fn invitation_wire_is_versioned_compact_and_rejects_untrusted_derp_urls() {
     let invitation = PairingInvitation {
         version: 1,
         address: format!("tc{}", "a".repeat(80)),
-        invite: zeron_engine::peer_auth::Invite {
+        invite: kratos_engine::peer_auth::Invite {
             version: 1,
             profile_id: uuid::Uuid::new_v4().to_string(),
             invite_id: uuid::Uuid::new_v4().to_string(),
@@ -63,7 +63,7 @@ mod unix {
     use std::os::unix::fs::PermissionsExt as _;
 
     use base64::Engine as _;
-    use zeron_engine::peer_auth::{DeviceIdentity, RedeemRequest};
+    use kratos_engine::peer_auth::{DeviceIdentity, RedeemRequest};
 
     struct Fixture {
         _root: tempfile::TempDir,
@@ -171,7 +171,7 @@ exec sleep 86400 >/dev/null 2>&1
         // Engine assembly warms the user's interactive login-shell PATH. This
         // test has no CLI discovery work and runs under a detached test PTY,
         // where an interactive shell would correctly stop on SIGTTIN.
-        unsafe { std::env::set_var("ZERON_NO_LOGIN_SHELL", "1") };
+        unsafe { std::env::set_var("KRATOS_NO_LOGIN_SHELL", "1") };
         let fixture = Fixture::new();
         let host = Auth::open(auth_config(&fixture.host_dir, &fixture.adapter)).expect("host auth");
         assert_eq!(host.state(), AuthState::SignedOut);
@@ -485,8 +485,8 @@ exec sleep 86400 >/dev/null 2>&1
 
     #[tokio::test]
     async fn failed_host_readiness_releases_the_reserved_listener_port() {
-        use zeron_engine::peer_auth::AuthStore;
-        use zeron_engine::peer_runtime::{PeerRuntime, PeerRuntimeConfig};
+        use kratos_engine::peer_auth::AuthStore;
+        use kratos_engine::peer_runtime::{PeerRuntime, PeerRuntimeConfig};
 
         let fixture = Fixture::new();
         let bad = fixture._root.path().join("bad-readiness-tailcat");

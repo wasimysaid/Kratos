@@ -28,8 +28,8 @@ pub(super) fn merge_state(state: &mut Value, update: &Value) {
     }
 }
 
-pub(super) fn metadata_events(state: &Value) -> Vec<zeron_proto::AgentEvent> {
-    use zeron_proto::AgentEvent;
+pub(super) fn metadata_events(state: &Value) -> Vec<kratos_proto::AgentEvent> {
+    use kratos_proto::AgentEvent;
     let mut events = Vec::new();
     if let Some(title) = state
         .get("title")
@@ -118,7 +118,7 @@ pub(super) async fn apply(
                     "agent rejected requested model {model:?}: {error}"
                 )));
             }
-            tracing::debug!(target: "zeron_harness::acp", %id, %error, "agent rejected auxiliary setting");
+            tracing::debug!(target: "kratos_harness::acp", %id, %error, "agent rejected auxiliary setting");
         }
     }
     if let Some(model) = first_class_model_change(state, model)? {

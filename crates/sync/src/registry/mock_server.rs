@@ -1,5 +1,5 @@
 //! In-process registry server speaking the durable peer's JSON WebSocket
-//! protocol and using the same [`zeron_doc::apply_op`] merge function as clients.
+//! protocol and using the same [`kratos_doc::apply_op`] merge function as clients.
 //! Test infrastructure only (`mock-server` feature): client and engine tests use
 //! this for deterministic fault injection; real adapter/peer coverage lives in
 //! `real_tailcat`, `peer_preservation`, and `peer_clients`.
@@ -13,7 +13,7 @@ use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 
-use zeron_doc::{RegistryRow, RowOp, apply_op};
+use kratos_doc::{RegistryRow, RowOp, apply_op};
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)

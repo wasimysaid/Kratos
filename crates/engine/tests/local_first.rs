@@ -11,8 +11,8 @@ use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tokio_tungstenite::tungstenite::handshake::server::{
     Request as WsRequest, Response as WsResponse,
 };
-use zeron_engine::{AuthState, Engine, EngineConfig, EngineInfo, HarnessId, WorkspaceScope};
-use zeron_rpc::{connect_ws, memory_client, methods};
+use kratos_engine::{AuthState, Engine, EngineConfig, EngineInfo, HarnessId, WorkspaceScope};
+use kratos_rpc::{connect_ws, memory_client, methods};
 
 fn config(
     data_dir: &std::path::Path,
@@ -525,12 +525,12 @@ async fn headless_sign_out_from_local_mode_stops_daemon_and_releases_ipc() {
 async fn configured_edge_core_shutdown_stops_workers_and_retires_the_graph() {
     let dir = tempfile::tempdir().unwrap();
     let (edge_url, requests, edge_task) = rejecting_edge().await;
-    let profile = zeron_engine::EngineProfile::local(dir.path()).expect("local profile");
-    let core = zeron_engine::EngineCore::assemble_with_profile(
+    let profile = kratos_engine::EngineProfile::local(dir.path()).expect("local profile");
+    let core = kratos_engine::EngineCore::assemble_with_profile(
         profile,
-        Arc::new(zeron_engine::default_registry()),
+        Arc::new(kratos_engine::default_registry()),
         HarnessId::Mock,
-        Some(zeron_engine::EdgeConfig::with_static_token(
+        Some(kratos_engine::EdgeConfig::with_static_token(
             edge_url,
             "test-token",
         )),
@@ -567,11 +567,11 @@ async fn paired_profile_cold_boots_offline_then_flushes_cached_chat_and_queue() 
     use std::os::unix::fs::PermissionsExt as _;
     use std::time::{Duration, Instant};
 
-    use zeron_engine::peer_auth::{AuthStore, DeviceIdentity};
-    use zeron_engine::{Auth, AuthConfig, EngineProfile, default_registry};
+    use kratos_engine::peer_auth::{AuthStore, DeviceIdentity};
+    use kratos_engine::{Auth, AuthConfig, EngineProfile, default_registry};
 
     // Detached test runners can stop interactive login shells on SIGTTIN.
-    unsafe { std::env::set_var("ZERON_NO_LOGIN_SHELL", "1") };
+    unsafe { std::env::set_var("KRATOS_NO_LOGIN_SHELL", "1") };
 
     let dir = tempfile::tempdir().expect("tempdir");
     let data = dir.path().join("device");
@@ -605,7 +605,7 @@ async fn paired_profile_cold_boots_offline_then_flushes_cached_chat_and_queue() 
 
     let profile = EngineProfile::paired(&data, &principal.profile_id).expect("paired profile");
     {
-        let seeded = zeron_engine::EngineCore::assemble_with_profile(
+        let seeded = kratos_engine::EngineCore::assemble_with_profile(
             profile.clone(),
             Arc::new(default_registry()),
             HarnessId::Mock,
@@ -632,7 +632,7 @@ async fn paired_profile_cold_boots_offline_then_flushes_cached_chat_and_queue() 
 
     // Model a profile that completed chat2 adoption before going offline: its
     // cached snapshot is epoch 2 and remains immediately readable on restart.
-    let docs = zeron_sync::DocsStore::open(profile.store_root()).expect("cached docs");
+    let docs = kratos_sync::DocsStore::open(profile.store_root()).expect("cached docs");
     let (snapshot, cursor, _) = docs
         .load_snapshot_with_cursor("offline-chat")
         .expect("load cached snapshot")

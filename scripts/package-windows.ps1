@@ -6,7 +6,7 @@ if (-not $ReleasesUrl.StartsWith('https://')) { throw 'Release feed must use HTT
 $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
 try {
-    cargo build --release --locked -p zeron
+    cargo build --release --locked -p kratos
     if ($LASTEXITCODE -ne 0) { throw 'Windows build failed' }
 
     $tailcatOut = Join-Path $root 'target/tailcat'
@@ -21,22 +21,22 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Tailcat companion build failed' }
     } finally { Pop-Location }
     # Pipe GUI-subsystem executables so PowerShell waits for their output.
-    $versionText = & ./target/release/zeron.exe --version | Out-String
-    $versionMatch = [regex]::Match($versionText.Trim(), '^zeron (\d+\.\d+\.\d+)$')
+    $versionText = & ./target/release/kratos.exe --version | Out-String
+    $versionMatch = [regex]::Match($versionText.Trim(), '^kratos (\d+\.\d+\.\d+)$')
     if ($LASTEXITCODE -ne 0 -or -not $versionMatch.Success) { throw "Cannot read executable version: $versionText" }
     $version = $versionMatch.Groups[1].Value
     $out = Join-Path $root 'target/package'
-    $stage = Join-Path $out "zeron-$version-windows-x86_64"
+    $stage = Join-Path $out "kratos-$version-windows-x86_64"
     Remove-Item -Recurse -Force -ErrorAction SilentlyContinue $stage
     New-Item -ItemType Directory -Force -Path $stage | Out-Null
-    Copy-Item -LiteralPath './target/release/zeron.exe' -Destination (Join-Path $stage 'zeron.exe')
+    Copy-Item -LiteralPath './target/release/kratos.exe' -Destination (Join-Path $stage 'kratos.exe')
 
     $companion = Join-Path $stage 'kratos-tailcat.exe'
     Copy-Item -LiteralPath './target/tailcat/kratos-tailcat.exe' -Destination $companion
     $companionHash = (Get-FileHash -LiteralPath $companion -Algorithm SHA256).Hash.ToLowerInvariant()
     # The updater validates this digest after safely extracting the complete ZIP.
     @{ releases_url = $ReleasesUrl; companion = @{ file = 'kratos-tailcat.exe'; sha256 = $companionHash } } |
-        ConvertTo-Json -Depth 3 | Set-Content -Encoding utf8NoBOM -LiteralPath (Join-Path $stage 'zeron-update.json')
+        ConvertTo-Json -Depth 3 | Set-Content -Encoding utf8NoBOM -LiteralPath (Join-Path $stage 'kratos-update.json')
     Copy-Item -LiteralPath 'LICENSE','THIRD_PARTY_NOTICES.md' -Destination $stage
     $licenses = Join-Path $stage 'licenses/fonts'
     New-Item -ItemType Directory -Force -Path $licenses | Out-Null
@@ -47,7 +47,7 @@ try {
     Copy-Item -Recurse -Path 'connectivity/tailcat/licenses/bundle/*' -Destination $tailcatLicenses
     Compress-Archive -Path "$stage/*" -DestinationPath "$stage.zip" -Force
     # Retained only as a legacy app-only artifact; updater and fresh installs use ZIP.
-    Copy-Item -LiteralPath './target/release/zeron.exe' -Destination "$stage.exe"
+    Copy-Item -LiteralPath './target/release/kratos.exe' -Destination "$stage.exe"
     $zipFile = Split-Path "$stage.zip" -Leaf
     $zipHash = (Get-FileHash -LiteralPath "$stage.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
     @{ version = $version; files = @{ $zipFile = @{ sha256 = $zipHash } } } |

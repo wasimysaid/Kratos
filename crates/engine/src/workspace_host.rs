@@ -19,9 +19,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 use chrono::Utc;
 use tokio::sync::watch;
 
-use zeron_doc::{DeletedSpace, REGISTRY_DOC_ID, RegistryDoc};
-use zeron_proto::{Chat, ChatConfig, Device, Session, Space};
-use zeron_sync::{DocsStore, RegistryClient, RegistryTuning};
+use kratos_doc::{DeletedSpace, REGISTRY_DOC_ID, RegistryDoc};
+use kratos_proto::{Chat, ChatConfig, Device, Session, Space};
+use kratos_sync::{DocsStore, RegistryClient, RegistryTuning};
 
 use crate::doc_host::EdgeConfig;
 use crate::{EngineError, now_ms};
@@ -77,7 +77,7 @@ pub(crate) async fn token_changed(changes: &mut Option<tokio::sync::watch::Recei
     }
 }
 
-async fn token_revoked(token: &Option<Arc<dyn zeron_rpc::TokenSource>>) -> bool {
+async fn token_revoked(token: &Option<Arc<dyn kratos_rpc::TokenSource>>) -> bool {
     match token {
         Some(token) => token.token().await.is_none(),
         // Fixed test/dev URLs have no revocable credential source.
@@ -213,7 +213,7 @@ impl WorkspaceHost {
             // Every boot restamps the running binary's version (fleet staleness
             // on the Devices page; workspace version — same for every crate).
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            capabilities: zeron_proto::capabilities::current(),
+            capabilities: kratos_proto::capabilities::current(),
         })?;
 
         let state = doc.read_all()?;
@@ -268,22 +268,22 @@ impl WorkspaceHost {
     /// server through this. Production always goes through [`Self::join_room`].
     #[doc(hidden)]
     pub fn connect_registry_url(&self, url: &str) {
-        self.spawn_join(Arc::new(zeron_sync::StaticUrl(url.to_string())), None, None);
+        self.spawn_join(Arc::new(kratos_sync::StaticUrl(url.to_string())), None, None);
     }
 
     fn spawn_join(
         &self,
-        url: Arc<dyn zeron_sync::UrlProvider>,
+        url: Arc<dyn kratos_sync::UrlProvider>,
         mut token_changes: Option<tokio::sync::watch::Receiver<u64>>,
-        token: Option<Arc<dyn zeron_rpc::TokenSource>>,
+        token: Option<Arc<dyn kratos_rpc::TokenSource>>,
     ) {
         let org_id = self.inner.config.org_id.clone();
         let reg = self.inner.reg.clone();
         let device_id = self.inner.config.device_id.clone();
         let weak = Arc::downgrade(&self.inner);
         tokio::spawn(async move {
-            let mut wake = zeron_sync::wake::subscribe();
-            let mut online = zeron_sync::wake::subscribe_online();
+            let mut wake = kratos_sync::wake::subscribe();
+            let mut online = kratos_sync::wake::subscribe_online();
             // `RegistryClient` only self-reconnects AFTER a first successful
             // join; an INITIAL failure (a 500 from an overloaded DO, a token
             // racing a refresh, an edge deploy) must not end this task and
@@ -340,7 +340,7 @@ impl WorkspaceHost {
                         loop {
                             tokio::select! {
                                 event = events.recv() => match event {
-                                    Ok(zeron_sync::RegistryEvent::Connected) => {
+                                    Ok(kratos_sync::RegistryEvent::Connected) => {
                                         let Some(inner) = weak.upgrade() else { return };
                                         // Re-join: restart the dial gate's
                                         // warm-up clock (presence map is empty
@@ -350,15 +350,15 @@ impl WorkspaceHost {
                                             .store(now_ms(), std::sync::atomic::Ordering::Relaxed);
                                         inner.bump_changed();
                                     }
-                                    Ok(zeron_sync::RegistryEvent::Applied) => {
+                                    Ok(kratos_sync::RegistryEvent::Applied) => {
                                         let Some(inner) = weak.upgrade() else { return };
                                         inner.bump_changed();
                                     }
-                                    Ok(zeron_sync::RegistryEvent::Presence) => {
+                                    Ok(kratos_sync::RegistryEvent::Presence) => {
                                         let Some(inner) = weak.upgrade() else { return };
                                         inner.publish();
                                     }
-                                    Ok(zeron_sync::RegistryEvent::Disconnected) => {}
+                                    Ok(kratos_sync::RegistryEvent::Disconnected) => {}
                                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
                                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                                 },
@@ -433,8 +433,8 @@ impl WorkspaceHost {
     /// down, relay fine: the 2026-08-18 03:45 incident shape) must never
     /// park the relay. Un-park is presence-driven: heartbeats resume → the
     /// verdict flips and the peer-alive hook clears any dial cooldown.
-    pub fn peer_liveness(&self, device_id: &str) -> zeron_rpc::PeerLiveness {
-        use zeron_rpc::PeerLiveness::{Dark, Live, Unknown};
+    pub fn peer_liveness(&self, device_id: &str) -> kratos_rpc::PeerLiveness {
+        use kratos_rpc::PeerLiveness::{Dark, Live, Unknown};
         if device_id == self.inner.config.device_id {
             return Live;
         }
@@ -521,15 +521,15 @@ impl WorkspaceHost {
         }
     }
 
-    /// Registry room introspection for SyncStatus / `zeron sync`.
+    /// Registry room introspection for SyncStatus / `kratos sync`.
     /// `None` = no room yet (edge-less, or the initial join is still retrying).
-    pub fn sync_status(&self) -> Option<zeron_sync::RoomStatsSnapshot> {
+    pub fn sync_status(&self) -> Option<kratos_sync::RoomStatsSnapshot> {
         lock(&self.inner.room).as_ref().map(|room| room.stats())
     }
 
     /// The registry room's reconnect posture (next-dial deadline + sticky
     /// last failure) for the connectivity stream. `None` = no room yet.
-    pub fn reconnect_state(&self) -> Option<zeron_sync::ReconnectState> {
+    pub fn reconnect_state(&self) -> Option<kratos_sync::ReconnectState> {
         lock(&self.inner.room)
             .as_ref()
             .map(|room| room.reconnect_state())
@@ -1016,7 +1016,7 @@ impl WorkspaceHost {
         Ok(self.mutate(|doc| doc.set_chat_archived(chat_id, archived))?)
     }
 
-    /// LWW full-config replace on the chat row (zeron `SetChatConfig` — the
+    /// LWW full-config replace on the chat row (kratos `SetChatConfig` — the
     /// composer's mid-session model/reasoning/options changes). Returns false
     /// when the chat doesn't exist.
     pub fn set_chat_config(&self, chat_id: &str, config: &ChatConfig) -> Result<bool, EngineError> {
@@ -1043,7 +1043,7 @@ impl WorkspaceHost {
     pub fn set_chat_source_context(
         &self,
         chat_id: &str,
-        context: &zeron_proto::ConversationSourceContext,
+        context: &kratos_proto::ConversationSourceContext,
     ) -> Result<bool, EngineError> {
         Ok(self.mutate(|doc| doc.set_chat_source_context(chat_id, context))?)
     }
@@ -1431,12 +1431,12 @@ fn device_name_on_boot(existing_name: Option<&str>, detected_name: &str) -> Stri
 /// auth path to maintain, and the `?beat=1` keeps presence alive for a
 /// device that can only reach the edge over HTTPS.
 struct WsDerivedRegistryTransport {
-    url: Arc<dyn zeron_sync::UrlProvider>,
+    url: Arc<dyn kratos_sync::UrlProvider>,
     client: reqwest::Client,
 }
 
 impl WsDerivedRegistryTransport {
-    fn new(url: Arc<dyn zeron_sync::UrlProvider>) -> Self {
+    fn new(url: Arc<dyn kratos_sync::UrlProvider>) -> Self {
         Self {
             url,
             client: reqwest::Client::new(),
@@ -1444,17 +1444,17 @@ impl WsDerivedRegistryTransport {
     }
 
     async fn leaf_url(
-        provider: &Arc<dyn zeron_sync::UrlProvider>,
+        provider: &Arc<dyn kratos_sync::UrlProvider>,
         leaf: &str,
-    ) -> Result<(reqwest::Url, Option<String>), zeron_sync::SyncError> {
+    ) -> Result<(reqwest::Url, Option<String>), kratos_sync::SyncError> {
         let ws = provider.url().await?;
         let mut u = reqwest::Url::parse(&ws)
-            .map_err(|e| zeron_sync::SyncError::Protocol(format!("bad ws url: {e}")))?;
+            .map_err(|e| kratos_sync::SyncError::Protocol(format!("bad ws url: {e}")))?;
         let scheme = if u.scheme() == "wss" { "https" } else { "http" };
         let _ = u.set_scheme(scheme);
         let path = u.path().to_string();
         let Some(base) = path.strip_suffix("/ws") else {
-            return Err(zeron_sync::SyncError::Protocol(
+            return Err(kratos_sync::SyncError::Protocol(
                 "ws url without /ws leaf".into(),
             ));
         };
@@ -1480,11 +1480,11 @@ impl WsDerivedRegistryTransport {
     }
 }
 
-impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
+impl kratos_sync::RegistryTransport for WsDerivedRegistryTransport {
     fn fetch(
         &self,
         since: u64,
-    ) -> futures::future::BoxFuture<'static, Result<String, zeron_sync::SyncError>> {
+    ) -> futures::future::BoxFuture<'static, Result<String, kratos_sync::SyncError>> {
         let provider = self.url.clone();
         let client = self.client.clone();
         Box::pin(async move {
@@ -1499,23 +1499,23 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
             let resp = req
                 .send()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))?;
+                .map_err(|e| kratos_sync::SyncError::WebSocket(e.to_string()))?;
             if !resp.status().is_success() {
-                return Err(zeron_sync::SyncError::Protocol(format!(
+                return Err(kratos_sync::SyncError::Protocol(format!(
                     "registry pull http {}",
                     resp.status()
                 )));
             }
             resp.text()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))
+                .map_err(|e| kratos_sync::SyncError::WebSocket(e.to_string()))
         })
     }
 
     fn push(
         &self,
         body: String,
-    ) -> futures::future::BoxFuture<'static, Result<String, zeron_sync::SyncError>> {
+    ) -> futures::future::BoxFuture<'static, Result<String, kratos_sync::SyncError>> {
         let provider = self.url.clone();
         let client = self.client.clone();
         Box::pin(async move {
@@ -1530,16 +1530,16 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
             let resp = req
                 .send()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))?;
+                .map_err(|e| kratos_sync::SyncError::WebSocket(e.to_string()))?;
             if !resp.status().is_success() {
-                return Err(zeron_sync::SyncError::Protocol(format!(
+                return Err(kratos_sync::SyncError::Protocol(format!(
                     "registry push http {}",
                     resp.status()
                 )));
             }
             resp.text()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))
+                .map_err(|e| kratos_sync::SyncError::WebSocket(e.to_string()))
         })
     }
 }
@@ -1661,22 +1661,22 @@ mod tests {
 
     #[test]
     fn remote_registry_session_keeps_goal_capability_for_ui_routing() {
-        let mut registry = zeron_doc::RegistryDoc::new("host");
-        let goal = zeron_proto::GoalState {
+        let mut registry = kratos_doc::RegistryDoc::new("host");
+        let goal = kratos_proto::GoalState {
             id: "goal-1".into(),
             objective: "Ship replication".into(),
-            phase: zeron_proto::GoalPhase::Paused,
+            phase: kratos_proto::GoalPhase::Paused,
             reason: Some("Waiting".into()),
             completion: None,
         };
         registry
-            .upsert_session(&zeron_proto::Session {
+            .upsert_session(&kratos_proto::Session {
                 goal: Some(goal.clone()),
                 goal_control: true,
                 last_completed_turn: None,
                 chat_id: "chat-1".into(),
                 device_id: "host".into(),
-                status: zeron_proto::SessionStatus::Working,
+                status: kratos_proto::SessionStatus::Working,
                 started_at: None,
                 updated_at: chrono::Utc::now(),
             })

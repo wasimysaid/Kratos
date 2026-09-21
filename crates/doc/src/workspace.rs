@@ -1,4 +1,4 @@
-//! Workspace doc schema over `loro` — the per-org entity index that replaces zeron's
+//! Workspace doc schema over `loro` — the per-org entity index that replaces kratos's
 //! residual entity sync (ARCHITECTURE.md §2.2). Lives in its own DO room (same
 //! SessionRoom class, doc id `ws/{orgId}`).
 //!
@@ -17,18 +17,18 @@
 //!
 //! Writer discipline (ARCHITECTURE §2.2): each device writes its own device row, its
 //! own session rows, and rows for chats it hosts; title/archived renames are LWW map
-//! sets from any device — matching zeron's Mutate surface. Presence rides the room's
+//! sets from any device — matching kratos's Mutate surface. Presence rides the room's
 //! `EphemeralStore` under keys `presence/{deviceId}` (an online timestamp), replacing
-//! zeron's 15s heartbeat writes so liveness never grows the oplog.
+//! kratos's 15s heartbeat writes so liveness never grows the oplog.
 //!
 //! Timestamps are stored as epoch millis (the session-doc convention) and surface as
-//! `chrono::DateTime<Utc>` through the `zeron_proto` entity types.
+//! `chrono::DateTime<Utc>` through the `kratos_proto` entity types.
 
 use chrono::{DateTime, Utc};
 use loro::{ExportMode, LoroDoc, LoroMap, LoroValue, ToJson};
 use serde::{Deserialize, Serialize};
 
-use zeron_proto::{Chat, ChatConfig, Device, Session, SessionStatus, Space};
+use kratos_proto::{Chat, ChatConfig, Device, Session, SessionStatus, Space};
 
 use crate::schema::DocError;
 
@@ -361,7 +361,7 @@ impl WorkspaceDoc {
     pub fn set_chat_source_context(
         &self,
         chat_id: &str,
-        context: &zeron_proto::ConversationSourceContext,
+        context: &kratos_proto::ConversationSourceContext,
     ) -> Result<bool, DocError> {
         let Some(row) = self.existing_row("chats", chat_id) else {
             return Ok(false);
@@ -411,7 +411,7 @@ impl WorkspaceDoc {
     }
 
     /// Host-side resume continuity: the harness-native session id of the chat's
-    /// latest run and the cwd it was created under (zeron stored the same pair
+    /// latest run and the cwd it was created under (kratos stored the same pair
     /// on the chats table). An empty
     /// `session_id` is the explicit "do not resume" tombstone written after a
     /// harness rejects a resume. `false` when no such row.
@@ -682,7 +682,7 @@ pub(crate) struct RawChat {
     #[serde(default)]
     checkout_id: Option<String>,
     #[serde(default)]
-    source_context: Option<zeron_proto::ConversationSourceContext>,
+    source_context: Option<kratos_proto::ConversationSourceContext>,
     /// LENIENT: a config this build can't decode (a harness/reasoning/sandbox
     /// id from a NEWER peer — field incident: pre-v0.2.10 laptops dropped
     /// every `"opencode"` chat row wholesale, so new sessions silently never
@@ -755,7 +755,7 @@ impl From<RawChat> for Chat {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RawSession {
     #[serde(default)]
-    goal: Option<zeron_proto::GoalState>,
+    goal: Option<kratos_proto::GoalState>,
     #[serde(default)]
     goal_control: bool,
     #[serde(default)]
@@ -787,7 +787,7 @@ impl From<RawSession> for Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use zeron_proto::{HarnessId, SandboxLevel};
+    use kratos_proto::{HarnessId, SandboxLevel};
 
     fn ts(ms: i64) -> DateTime<Utc> {
         dt(ms)
@@ -884,7 +884,7 @@ mod tests {
         let config = ChatConfig {
             harness: HarnessId::ClaudeCode,
             model: Some("claude-fable-5".into()),
-            reasoning: Some(zeron_proto::ReasoningLevel::XHigh),
+            reasoning: Some(kratos_proto::ReasoningLevel::XHigh),
             model_options: options,
             sandbox: SandboxLevel::WorkspaceWrite,
         };
@@ -900,7 +900,7 @@ mod tests {
     fn conversation_source_context_round_trips_with_legacy_fields() {
         let ws = WorkspaceDoc::new();
         ws.upsert_chat(&chat("chat-1", "dev-a")).unwrap();
-        let context = zeron_proto::ConversationSourceContext {
+        let context = kratos_proto::ConversationSourceContext {
             checkout_id: "checkout-a".into(),
             repo_root: "/repo".into(),
             cwd: "/repo/worktree".into(),
@@ -937,7 +937,7 @@ mod tests {
     fn rows_round_trip() {
         let ws = WorkspaceDoc::new();
         let mut device = device("dev-a", "laptop");
-        device.capabilities = vec![zeron_proto::capabilities::MESSAGE_QUEUE_V1.into()];
+        device.capabilities = vec![kratos_proto::capabilities::MESSAGE_QUEUE_V1.into()];
         ws.upsert_device(&device).unwrap();
         ws.upsert_chat(&chat("chat-1", "dev-a")).unwrap();
         ws.upsert_session(&session("chat-1", "dev-a", SessionStatus::Working))

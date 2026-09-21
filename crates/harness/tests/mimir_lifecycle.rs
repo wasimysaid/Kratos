@@ -6,8 +6,8 @@ use std::{path::PathBuf, time::Duration};
 
 use futures::StreamExt;
 use tokio::sync::{mpsc, oneshot};
-use zeron_harness::{AcpHarness, CancellationToken, Harness, RunControls};
-use zeron_proto::{
+use kratos_harness::{AcpHarness, CancellationToken, Harness, RunControls};
+use kratos_proto::{
     AgentEvent, DoneStatus, HarnessId, RunRequest, SandboxLevel, UserInputAnswer, UserInputQuestion,
 };
 
@@ -358,7 +358,7 @@ async fn paused_goal_can_resume_in_same_public_stream_without_session_cancel() {
     .expect("paused goal ends its turn");
     assert_eq!(terminal_statuses(&events), [DoneStatus::Interrupted]);
     steer_tx
-        .send(zeron_harness::SteerMessage {
+        .send(kratos_harness::SteerMessage {
             prompt: "/goal resume".into(),
             message_id: None,
         })

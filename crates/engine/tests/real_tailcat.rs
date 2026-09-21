@@ -44,12 +44,12 @@ async fn rust_auth_pairing_and_engine_runtime_use_real_tailcat() {
     use std::process::{Command, Stdio};
     use std::sync::Arc;
     use std::time::Duration;
-    use zeron_engine::{Auth, AuthConfig, Engine, EngineConfig, EngineProfile};
+    use kratos_engine::{Auth, AuthConfig, Engine, EngineConfig, EngineProfile};
 
-    use zeron_doc::{MessageRole, MessageStatus, QueueDeliveryGate, SessionCommandPayload};
-    use zeron_proto::{RunRequest, SandboxLevel};
+    use kratos_doc::{MessageRole, MessageStatus, QueueDeliveryGate, SessionCommandPayload};
+    use kratos_proto::{RunRequest, SandboxLevel};
 
-    use zeron_rpc::{memory_client, methods};
+    use kratos_rpc::{memory_client, methods};
 
     let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
@@ -163,7 +163,7 @@ async fn rust_auth_pairing_and_engine_runtime_use_real_tailcat() {
         &EngineConfig {
             data_dir: a_dir.path().to_owned(),
             ipc_port: 0,
-            default_harness: zeron_proto::HarnessId::Mock,
+            default_harness: kratos_proto::HarnessId::Mock,
         },
         auth_a.clone(),
         EngineProfile::synced(
@@ -178,7 +178,7 @@ async fn rust_auth_pairing_and_engine_runtime_use_real_tailcat() {
         &EngineConfig {
             data_dir: b_dir.path().to_owned(),
             ipc_port: 0,
-            default_harness: zeron_proto::HarnessId::Mock,
+            default_harness: kratos_proto::HarnessId::Mock,
         },
         auth_b.clone(),
         EngineProfile::synced(
@@ -680,7 +680,7 @@ async fn rust_auth_pairing_and_engine_runtime_use_real_tailcat() {
         &EngineConfig {
             data_dir: a_dir.path().to_owned(),
             ipc_port: 0,
-            default_harness: zeron_proto::HarnessId::Mock,
+            default_harness: kratos_proto::HarnessId::Mock,
         },
         auth_a.clone(),
         EngineProfile::synced(a_dir.path(), &profile_id, "user-a"),
@@ -691,7 +691,7 @@ async fn rust_auth_pairing_and_engine_runtime_use_real_tailcat() {
         &EngineConfig {
             data_dir: b_dir.path().to_owned(),
             ipc_port: 0,
-            default_harness: zeron_proto::HarnessId::Mock,
+            default_harness: kratos_proto::HarnessId::Mock,
         },
         auth_b.clone(),
         EngineProfile::synced(b_dir.path(), &profile_id, "user-b"),
@@ -874,7 +874,7 @@ async fn rust_auth_pairing_and_engine_runtime_use_real_tailcat() {
         &EngineConfig {
             data_dir: b_dir.path().to_owned(),
             ipc_port: 0,
-            default_harness: zeron_proto::HarnessId::Mock,
+            default_harness: kratos_proto::HarnessId::Mock,
         },
         auth_b.clone(),
         EngineProfile::synced(

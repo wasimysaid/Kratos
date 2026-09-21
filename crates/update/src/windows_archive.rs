@@ -6,17 +6,17 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, ensure};
 use sha2::{Digest, Sha256};
 
-pub(crate) const APP: &str = "zeron.exe";
+pub(crate) const APP: &str = "kratos.exe";
 pub(crate) const ADAPTER: &str = "kratos-tailcat.exe";
-pub(crate) const CONFIG: &str = "zeron-update.json";
+pub(crate) const CONFIG: &str = "kratos-update.json";
 
-pub(crate) const PENDING: &str = ".zeron-update-pending";
-pub(crate) const INCOMING_APP: &str = ".zeron-update-incoming-zeron.exe";
-pub(crate) const INCOMING_ADAPTER: &str = ".zeron-update-incoming-kratos-tailcat.exe";
-pub(crate) const INCOMING_CONFIG: &str = ".zeron-update-incoming-config.json";
-pub(crate) const BACKUP_APP: &str = ".zeron-update-backup-zeron.exe";
-pub(crate) const BACKUP_ADAPTER: &str = ".zeron-update-backup-kratos-tailcat.exe";
-pub(crate) const BACKUP_CONFIG: &str = ".zeron-update-backup-config.json";
+pub(crate) const PENDING: &str = ".kratos-update-pending";
+pub(crate) const INCOMING_APP: &str = ".kratos-update-incoming-kratos.exe";
+pub(crate) const INCOMING_ADAPTER: &str = ".kratos-update-incoming-kratos-tailcat.exe";
+pub(crate) const INCOMING_CONFIG: &str = ".kratos-update-incoming-config.json";
+pub(crate) const BACKUP_APP: &str = ".kratos-update-backup-kratos.exe";
+pub(crate) const BACKUP_ADAPTER: &str = ".kratos-update-backup-kratos-tailcat.exe";
+pub(crate) const BACKUP_CONFIG: &str = ".kratos-update-backup-config.json";
 const MAX_FILE_SIZE: u64 = 512 * 1024 * 1024;
 const MAX_TOTAL_SIZE: u64 = 1024 * 1024 * 1024;
 
@@ -106,7 +106,7 @@ pub(crate) fn validate(root: &Path) -> anyhow::Result<Payload> {
     };
     ensure!(
         payload.app.is_file(),
-        "Windows update ZIP is missing zeron.exe"
+        "Windows update ZIP is missing kratos.exe"
     );
     ensure!(
         payload.adapter.is_file(),
@@ -333,7 +333,7 @@ mod tests {
             "licenses/tailcat/modules/evil.dylib",
             "licenses/tailcat/modules/notice.md",
             "licenses/tailcat/modules/deeper/LICENSE.txt",
-            "sub/zeron.exe",
+            "sub/kratos.exe",
         ] {
             let zip = archive(&[(name, b"bad", None)]);
             assert!(

@@ -23,7 +23,7 @@ contain secret key material and are not application authorization. IPC-only meth
 remain unavailable remotely.
 
 Tailcat exposes Go `Server.Listen`, `Client.DialTCPPort` and persistent keys. Its
-allowlist only supports additions, not revocation of existing peers; Zeron handles
+allowlist only supports additions, not revocation of existing peers; Kratos handles
 application revocation. Public DERP has rate limits, metadata logging, no SLA and
 potentially revocable access. Direct UDP is opportunistic; relay-only operation and
 an owned HTTPS DERP map are supported. iOS uses an embedded native bridge because
@@ -61,11 +61,11 @@ backup/restore of the new peer remain: recovery is not cross-profile migration.
 ## Verification record
 
 After the PR recovery fixes, the parent ran the combined engine/doc/rpc/sync/
-preview/update/CLI suite with `--locked`, `zeron-sync/mock-server`, and serial
+preview/update/CLI suite with `--locked`, `kratos-sync/mock-server`, and serial
 execution: **600 passed**, no failures, four existing credential/private-fixture
 tests ignored. Log: `target/verification/pr8-final-integrated.log`. Subsequent
 backup-publication changes passed the focused peer-backup and CLI backup tests.
-The built binary rejects `zeron migrate`; current peer backup/restore help remains.
+The built binary rejects `kratos migrate`; current peer backup/restore help remains.
 
 Fresh-start regressions verify old/global/local upload roots stay inaccessible
 from a new paired profile while source files remain untouched, removed import

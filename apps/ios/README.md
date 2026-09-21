@@ -1,6 +1,6 @@
-# Zeron for iOS
+# Kratos for iOS
 
-A native SwiftUI viewport onto the zeron mesh. The phone is a **peer
+A native SwiftUI viewport onto the kratos mesh. The phone is a **peer
  device**: an embedded Tailcat client joins the same Loro CRDT rooms as every
  other device, while a loopback-only proxy preserves the `/chat2`, `/registry`,
  `/device`, and `/blob` HTTP/WebSocket wire protocols. No engine runs on the phone.
@@ -17,7 +17,7 @@ go install golang.org/x/mobile/cmd/gomobile@v0.0.0-20260908204917-8b95e45f8d3e
 go install golang.org/x/mobile/cmd/gobind@v0.0.0-20260908204917-8b95e45f8d3e
 cd apps/ios
 ./Native/build-xcframework.sh
-xcodebuild -project Zeron.xcodeproj -scheme Zeron \
+xcodebuild -project Kratos.xcodeproj -scheme Kratos \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 ```
 
@@ -67,7 +67,7 @@ The workflow uses the `AC_API_KEY_P8`, `AC_API_KEY_ID`, and
 
 Wire contract: secrets, nonces, signatures, and public keys use unpadded RFC
 4648 base64url. Proof bytes exactly match `peer_auth.rs`: the NUL-terminated
-`zeron.peer-auth.invite-redeem.v1` or `zeron.peer-auth.challenge.v1` domain,
+`kratos.peer-auth.invite-redeem.v1` or `kratos.peer-auth.challenge.v1` domain,
 followed by each field as `u32` big-endian length plus raw bytes. Redeem fields
 are version byte, profile ID, invite ID, decoded 32-byte secret, public key;
 auth fields are profile ID, derived device ID, challenge ID, decoded nonce.
@@ -81,9 +81,9 @@ auth fields are profile ID, derived device ID, challenge ID, decoded nonce.
 Run the AppModel cache/startup/revocation integration coverage on macOS with:
 
 ```sh
-xcodebuild test -project apps/ios/Zeron.xcodeproj -scheme Zeron \
+xcodebuild test -project apps/ios/Kratos.xcodeproj -scheme Kratos \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:ZeronTests/AppModelIntegrationTests
+  -only-testing:KratosTests/AppModelIntegrationTests
 ```
 
 ### Sessions without a project
@@ -108,10 +108,10 @@ project filters and the existing project flow). Run on an Xcode 26+ Mac:
 
 ```sh
 cd apps/ios
-xcodebuild -project Zeron.xcodeproj -scheme Zeron \
+xcodebuild -project Kratos.xcodeproj -scheme Kratos \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:ZeronTests/ProjectlessSessionTests \
-  -only-testing:ZeronUITests/ProjectlessSessionUITests test
+  -only-testing:KratosTests/ProjectlessSessionTests \
+  -only-testing:KratosUITests/ProjectlessSessionUITests test
 ```
 
 Demo fixtures accept `-no-projects` (empty spaces/chats), `-ios-only` (no

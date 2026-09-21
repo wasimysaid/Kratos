@@ -24,11 +24,11 @@ use gpui::{
     px,
 };
 
-use zeron_engine::registry::TitleSettings;
-use zeron_engine::registry::{HarnessDescriptor, descriptor_enabled};
-use zeron_proto::HarnessId;
-use zeron_proto::Model;
-use zeron_rpc::methods;
+use kratos_engine::registry::TitleSettings;
+use kratos_engine::registry::{HarnessDescriptor, descriptor_enabled};
+use kratos_proto::HarnessId;
+use kratos_proto::Model;
+use kratos_rpc::methods;
 
 use crate::pickers::visible_harnesses;
 use crate::popover::{self, Loadable};
@@ -347,7 +347,7 @@ impl HarnessesPage {
                             .filter(|h| {
                                 descriptor_enabled(h)
                                     && h.installed
-                                    && zeron_harness::supports_titles(h.id)
+                                    && kratos_harness::supports_titles(h.id)
                                     && h.id != HarnessId::Mock
                             })
                             .map(|h| {

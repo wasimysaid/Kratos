@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>application-identifier</key>
-	<string>5XY3M483YQ.sh.zeron.ios</string>
+	<string>5XY3M483YQ.sh.kratos.ios</string>
 	<key>com.apple.developer.team-identifier</key>
 	<string>5XY3M483YQ</string>
 
@@ -11,7 +11,7 @@
 	<true/>
 	<key>keychain-access-groups</key>
 	<array>
-		<string>5XY3M483YQ.sh.zeron.ios</string>
+		<string>5XY3M483YQ.sh.kratos.ios</string>
 	</array>
 </dict>
 </plist>

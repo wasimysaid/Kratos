@@ -10,7 +10,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::{mpsc, watch};
-use zeron_proto::{AgentChild, AgentEvent, ChildTranscript, GoalState, ToolCall};
+use kratos_proto::{AgentChild, AgentEvent, ChildTranscript, GoalState, ToolCall};
 
 pub(super) const KEY: &str = "mimir.dev/session";
 

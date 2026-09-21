@@ -11,7 +11,7 @@
 use std::collections::VecDeque;
 
 use serde_json::Value;
-use zeron_proto::{AgentEvent, SlashCommand, TodoItem, ToolCall, ToolDiff};
+use kratos_proto::{AgentEvent, SlashCommand, TodoItem, ToolCall, ToolDiff};
 
 /// Full public payload budget for normalized events, journal replay and output
 /// retrieval. Keep Mimir's 64 KiB proposal body plus outline/diagnostics intact;
@@ -200,7 +200,7 @@ fn arg_from_title(title: &str) -> Option<String> {
 }
 
 /// Reduce an ACP tool call (kind + title + rawInput + locations + diff
-/// content) to the typed [`ToolCall`] zeron renders. Best-effort: agents vary
+/// content) to the typed [`ToolCall`] kratos renders. Best-effort: agents vary
 /// in how much structure they put in `rawInput`, so every arm has a fallback.
 /// Title is only used when it looks like a real arg — never a placeholder
 /// label or markdown-escaped summary.
@@ -655,11 +655,11 @@ pub(crate) fn map_update(update: &Value) -> Vec<AgentEvent> {
             // update refresh the same chip (fold refreshes in place by id).
             vec![
                 AgentEvent::ToolCall {
-                    id: zeron_proto::LIVE_PLAN_TOOL_ID.into(),
+                    id: kratos_proto::LIVE_PLAN_TOOL_ID.into(),
                     call: ToolCall::Todo { items },
                 },
                 AgentEvent::ToolResult {
-                    id: zeron_proto::LIVE_PLAN_TOOL_ID.into(),
+                    id: kratos_proto::LIVE_PLAN_TOOL_ID.into(),
                     is_error: false,
                     output: None,
                     diff: None,
@@ -1551,7 +1551,7 @@ mod tests {
         assert_eq!(
             events[0],
             AgentEvent::ToolCall {
-                id: zeron_proto::LIVE_PLAN_TOOL_ID.into(),
+                id: kratos_proto::LIVE_PLAN_TOOL_ID.into(),
                 call: ToolCall::Todo {
                     items: vec![
                         TodoItem {
