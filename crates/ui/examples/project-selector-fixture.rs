@@ -45,9 +45,11 @@ fn main() {
             ])).unwrap();
             s
         });
-        let boot = EngineBootConfig { data_dir: data, ipc_port: 0, edge_url: String::new(),
-            edge_token: None, org_id: None, workos_client_id: None,
-            default_harness: HarnessId::ClaudeCode };
+        let boot = EngineBootConfig {
+            data_dir: data,
+            ipc_port: 0,
+            default_harness: HarnessId::ClaudeCode,
+        };
         cx.open_window(WindowOptions {
             window_bounds: Some(WindowBounds::Windowed(Bounds::new(point(px(0.), px(0.)), size(px(1000.), px(680.))))),
             ..Default::default()

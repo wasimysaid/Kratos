@@ -22,6 +22,9 @@ pub enum HarnessId {
     /// protocol (`opencode serve` — the same wire the opencode desktop app
     /// speaks).
     Opencode,
+    /// google's antigravity agent over acp (`agy_acp_server`, installed from
+    /// its pinned release archive).
+    Antigravity,
     /// Test harness; never shown in production pickers.
     Mock,
 }
@@ -141,6 +144,10 @@ pub struct WorktreeSpec {
     pub repo_path: String,
     /// Base ref the fresh `zeron/<name>` branch is created off.
     pub base: String,
+    /// Owning project used to resolve host-local setup Actions. Optional for
+    /// wire compatibility with clients that only request worktree creation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub space_id: Option<String>,
 }
 
 /// The session-scoped singleton id for the live plan/todo chip. ACP plan
@@ -724,11 +731,13 @@ mod tests {
             worktree: Some(WorktreeSpec {
                 repo_path: "/repos/comet".into(),
                 base: "main".into(),
+                space_id: Some("space-1".into()),
             }),
             ..req
         };
         let json = serde_json::to_value(&req).unwrap();
         assert_eq!(json["worktree"]["repoPath"], "/repos/comet");
+        assert_eq!(json["worktree"]["spaceId"], "space-1");
         let round: RunRequest = serde_json::from_value(json).unwrap();
         assert_eq!(round.worktree, req.worktree);
     }

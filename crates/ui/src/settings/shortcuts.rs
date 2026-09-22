@@ -480,11 +480,13 @@ fn group(id: ShortcutId) -> &'static str {
         ShortcutId::CaptureAppshot => "Appshots",
         ShortcutId::SaveFile => "Files",
         ShortcutId::BrowserReload => "Browser",
-        ShortcutId::ToggleSidebar | ShortcutId::ToggleChanges | ShortcutId::ToggleTerminal => {
-            "Panels"
-        }
+        ShortcutId::ToggleSidebar
+        | ShortcutId::ToggleChanges
+        | ShortcutId::ToggleFiles
+        | ShortcutId::ToggleTerminal => "Panels",
         ShortcutId::NewProject => "Projects",
-        ShortcutId::NewSession
+        ShortcutId::OpenModelPicker
+        | ShortcutId::NewSession
         | ShortcutId::NextSession
         | ShortcutId::PrevSession
         | ShortcutId::ArchiveSession => "Sessions",
@@ -503,9 +505,11 @@ fn description(id: ShortcutId) -> &'static str {
         ShortcutId::BrowserReload => "Reload the focused browser tab.",
         ShortcutId::ToggleSidebar => "Show or hide sessions and settings navigation.",
         ShortcutId::ToggleChanges => "Show or hide the right sidebar for the current session.",
+        ShortcutId::ToggleFiles => "Show or hide the files panel for the current session.",
         ShortcutId::ToggleTerminal => "Show or hide the terminal for the current session.",
         ShortcutId::NewSession => "Open a blank session canvas to start a new session.",
         ShortcutId::NewProject => "Open the new project dialog.",
+        ShortcutId::OpenModelPicker => "Open the model picker for the current session.",
         ShortcutId::NextSession => "Select the next session in the sidebar, wrapping at the end.",
         ShortcutId::PrevSession => {
             "Select the previous session in the sidebar, wrapping at the start."

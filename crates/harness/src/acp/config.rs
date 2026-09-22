@@ -86,6 +86,7 @@ pub(super) async fn apply(
     state: &mut Value,
     model: Option<&str>,
     efforts: &[&'static str],
+    strict_model_rejection: bool,
     traits: &serde_json::Map<String, Value>,
 ) -> Result<(), HarnessError> {
     let mut applied = HashSet::new();
@@ -113,7 +114,7 @@ pub(super) async fn apply(
             .any(|o| o["id"] == id && o["category"] == "model");
         applied.insert(id.clone());
         if let Err(error) = set(client, incoming, session, state, &id, payload).await {
-            if is_model {
+            if is_model && strict_model_rejection {
                 return Err(HarnessError::Protocol(format!(
                     "agent rejected requested model {model:?}: {error}"
                 )));

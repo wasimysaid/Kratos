@@ -1,6 +1,6 @@
 # Zeron
 
-默认在本地管理编码 agent（Claude Code、Codex、Cursor、Devin、Grok、Hermes、Pi 和 Mimir），也可启用私有多设备同步。
+默认在本地管理编码 agent（Claude Code、Codex、Cursor、Devin、Grok、Hermes、Pi、Mimir 和 Antigravity），也可启用私有多设备同步。
 
 *[English](README.md) | 简体中文*
 

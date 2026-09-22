@@ -59,13 +59,18 @@ macro_rules! icon_assets {
 }
 
 icon_assets![
+    (PROJECT_DEFAULT, "project-default"),
+    (REMOTE_SERVER, "remote-server"),
     // Solar Icons (Linear), CC BY 4.0 — 480 Design.
     (MONITOR, "monitor"),
+    (SUN, "sun"),
+    (MOON, "moon"),
     // Browser globe, drawn in the same linear weight as the toolbar family.
     (GLOBE, "globe"),
     (LAPTOP, "laptop"),
     (PEN_NEW_SQUARE, "pen-new-square"),
     (SORT, "sort"),
+    (MORE_HORIZONTAL, "more-horizontal"),
     (SORT_VERTICAL, "sort-vertical"),
     // Compact six-dot grip used to reorder queued prompts.
     (DRAG_HANDLE, "drag-handle"),
@@ -82,6 +87,8 @@ icon_assets![
     (CALENDAR, "calendar"),
     (LIST, "list"),
     (FOLDER_WITH_FILES, "folder-with-files"),
+    // Original tree glyph with compact nodes for the independent Files panel.
+    (FILE_TREE, "file-tree"),
     (FOLDER, "folder"),
     // Hand-drawn floppy disk in the Solar Linear style. Workspace editor save.
     (FLOPPY_DISK, "floppy-disk"),
@@ -141,6 +148,8 @@ icon_assets![
     (EYE, "eye"),
     (EYE_CLOSED, "eye-closed"),
     (PAPERCLIP, "paperclip"),
+    // Hand-drawn pushpin in the Solar Linear style for local sidebar pins.
+    (PIN, "pin"),
     (PEN, "pen"),
     (ARCHIVE_MINIMALISTIC, "archive-minimalistic"),
     (TRASH_BIN_MINIMALISTIC, "trash-bin-minimalistic"),
@@ -148,6 +157,8 @@ icon_assets![
     (SETTINGS_MINIMALISTIC, "settings-minimalistic"),
     (LOGOUT_2, "logout-2"),
     (MAGNIFER, "magnifer"),
+    // Compact magnifier with a distinct handle, matching the linear icon family.
+    (PALETTE_SEARCH, "palette-search"),
     (COMMAND, "command"),
     (DOCUMENT, "document"),
     (DOCUMENT_ADD, "document-add"),
@@ -194,6 +205,13 @@ icon_assets![
     (STOP, "stop"),
     (CHECK, "check"),
     (COPY, "copy"),
+    // Project Action icon family (Solar Linear-compatible strokes).
+    (ACTION_PLAY, "action-play"),
+    (ACTION_TEST, "action-test"),
+    (ACTION_LINT, "action-lint"),
+    (ACTION_CONFIGURE, "action-configure"),
+    (ACTION_BUILD, "action-build"),
+    (ACTION_DEBUG, "action-debug"),
     // Hand-drawn star pair in the Solar Linear style (like the terminal/
     // plus/return ports) — outline for the favorite affordance, bold for the
     // favorited state and the picker's favorites rail tab.
@@ -209,6 +227,7 @@ icon_assets![
     (HERMES_MARK, "hermes-mark"),
     (PI_MARK, "pi-mark"),
     (OPENCODE_MARK, "opencode-mark"),
+    (ANTIGRAVITY_MARK, "antigravity-mark"),
 ];
 
 /// Serves both the compact control-icon set and the complete file-identity

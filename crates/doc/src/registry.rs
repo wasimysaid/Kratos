@@ -19,16 +19,23 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use zeron_proto::{Chat, ChatConfig, Device, Session, Space};
+use zeron_proto::{Chat, ChatConfig, Device, MAX_SIDEBAR_PINS, Session, SidebarPreferences, Space};
 
 use crate::schema::DocError;
 use crate::workspace::{DeletedSpace, WorkspaceState};
 
-/// Row kinds — the four sidebar tables.
+/// Row kinds — synced sidebar entities plus user preferences.
 pub const KIND_DEVICES: &str = "devices";
 pub const KIND_SPACES: &str = "spaces";
 pub const KIND_CHATS: &str = "chats";
 pub const KIND_SESSIONS: &str = "sessions";
+pub const KIND_PREFERENCES: &str = "preferences";
+
+/// Readiness only; membership and order live on individual pins.
+pub const SIDEBAR_PINS_STATE_ID: &str = "sidebarPins";
+pub const KIND_SIDEBAR_PINS: &str = "sidebarPins";
+mod sidebar_pins;
+mod sidebar_sections;
 
 /// Snapshot row id in the local `DocsStore` for the persisted registry state.
 pub const REGISTRY_DOC_ID: &str = "registry1";
@@ -711,6 +718,11 @@ impl RegistryDoc {
             ("lastSeenAt", opt_ms(device.last_seen_at)),
             ("createdAt", opt_ms(device.created_at)),
             ("version", opt_str(device.version.as_deref())),
+            (
+                "cursorSdkVersion",
+                opt_str(device.cursor_sdk_version.as_deref()),
+            ),
+            ("cursorSdkEngineVersion", opt_str(device.version.as_deref())),
             ("capabilities", json!(device.capabilities)),
         ]);
         self.write(KIND_DEVICES, &device.id.clone(), OpKind::Upsert, set);
@@ -900,6 +912,7 @@ impl RegistryDoc {
                 "roomGen",
                 chat.room_gen.map(|g| json!(g)).unwrap_or(Value::Null),
             ),
+            ("parentChatId", opt_str(chat.parent_chat_id.as_deref())),
         ]);
         self.write(KIND_CHATS, &chat.id.clone(), OpKind::Upsert, set);
         Ok(())
@@ -1179,6 +1192,39 @@ impl RegistryDoc {
 
     // ── whole-doc read ──────────────────────────────────────────────────────
 
+    pub fn sidebar_preferences(&self) -> Option<SidebarPreferences> {
+        self.sidebar_pins_initialized().then(|| SidebarPreferences {
+            sections: self.sidebar_sections(),
+            pinned_session_ids: self
+                .ordered_sidebar_pins()
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect(),
+        })
+    }
+
+    /// Initialize readiness and clean deleted pins from one authoritative snapshot.
+    pub fn reconcile_sidebar_pins(&mut self, authoritative: bool) -> Result<bool, DocError> {
+        if !authoritative {
+            return Ok(false);
+        }
+        let initialized = self.sidebar_pins_initialized();
+        self.initialize_sidebar_pins();
+        let known: std::collections::HashSet<_> =
+            self.read_chats()?.into_iter().map(|c| c.id).collect();
+        let removed: Vec<_> = self
+            .ordered_sidebar_pins()
+            .into_iter()
+            .filter(|(id, _)| !known.contains(id))
+            .collect();
+        for (id, _) in &removed {
+            self.change_sidebar_pin(&zeron_proto::SidebarPinChange::Unpin {
+                session_id: id.clone(),
+            })?;
+        }
+        Ok(!initialized || !removed.is_empty())
+    }
+
     pub fn read_all(&self) -> Result<WorkspaceState, DocError> {
         Ok(WorkspaceState {
             devices: self.read_devices()?,
@@ -1186,6 +1232,133 @@ impl RegistryDoc {
             chats: self.read_chats()?,
             sessions: self.read_sessions()?,
         })
+    }
+
+    // ── migration ───────────────────────────────────────────────────────────
+
+    /// Seed from the legacy Loro workspace doc's materialized state (first
+    /// boot after the update). Every row becomes a pending upsert whose HLC
+    /// derives from the row's own newest timestamp — historical, so any
+    /// genuinely newer live write beats the migrated value; identical across
+    /// devices, so N devices seeding the same converged doc is idempotent
+    /// (equal values, deterministic device tie-break).
+    pub fn seed_from_workspace(&mut self, state: &WorkspaceState) -> Result<usize, DocError> {
+        let mut ops: Vec<RowOp> = Vec::new();
+        let mut seed = |kind: &str, id: &str, ms: i64, set: BTreeMap<String, Value>| {
+            ops.push(RowOp {
+                kind: kind.to_string(),
+                id: id.to_string(),
+                op: OpKind::Upsert,
+                set: Some(set),
+                hlc: encode_hlc(ms.max(1), 0, "migration"),
+                clocks: None,
+            });
+        };
+        for device in &state.devices {
+            let ms = newest(&[device.last_seen_at, device.created_at]);
+            seed(
+                KIND_DEVICES,
+                &device.id,
+                ms,
+                fields([
+                    ("id", json!(device.id)),
+                    ("name", json!(device.name)),
+                    ("platform", json!(device.platform)),
+                    ("lastSeenAt", opt_ms(device.last_seen_at)),
+                    ("createdAt", opt_ms(device.created_at)),
+                    ("version", opt_str(device.version.as_deref())),
+                    (
+                        "cursorSdkVersion",
+                        opt_str(device.cursor_sdk_version.as_deref()),
+                    ),
+                    ("cursorSdkEngineVersion", opt_str(device.version.as_deref())),
+                    ("capabilities", json!(device.capabilities)),
+                ]),
+            );
+        }
+        for space in &state.spaces {
+            let ms = newest(&[space.git_checked_at, Some(space.created_at)]);
+            seed(
+                KIND_SPACES,
+                &space.id,
+                ms,
+                fields([
+                    ("id", json!(space.id)),
+                    ("deviceId", json!(space.device_id)),
+                    ("path", json!(space.path)),
+                    ("name", opt_str(space.name.as_deref())),
+                    ("gitDetected", json!(space.git_detected)),
+                    ("gitCheckedAt", opt_ms(space.git_checked_at)),
+                    ("checkoutId", opt_str(space.checkout_id.as_deref())),
+                    ("createdAt", json!(space.created_at.timestamp_millis())),
+                ]),
+            );
+        }
+        for chat in &state.chats {
+            let ms = newest(&[
+                chat.last_message_at,
+                chat.last_seen_at,
+                Some(chat.created_at),
+            ]);
+            let config = match &chat.config {
+                Some(config) => serde_json::to_value(config)?,
+                None => Value::Null,
+            };
+            seed(
+                KIND_CHATS,
+                &chat.id,
+                ms,
+                fields([
+                    ("id", json!(chat.id)),
+                    ("deviceId", json!(chat.device_id)),
+                    ("title", opt_str(chat.title.as_deref())),
+                    ("archived", json!(chat.archived)),
+                    ("cwd", opt_str(chat.cwd.as_deref())),
+                    ("branch", opt_str(chat.branch.as_deref())),
+                    ("checkoutId", opt_str(chat.checkout_id.as_deref())),
+                    ("config", config),
+                    (
+                        "lastMessagePreview",
+                        opt_str(chat.last_message_preview.as_deref()),
+                    ),
+                    ("lastMessageAt", opt_ms(chat.last_message_at)),
+                    ("createdAt", json!(chat.created_at.timestamp_millis())),
+                    (
+                        "harnessSessionId",
+                        opt_str(chat.harness_session_id.as_deref()),
+                    ),
+                    (
+                        "harnessSessionCwd",
+                        opt_str(chat.harness_session_cwd.as_deref()),
+                    ),
+                    ("spaceId", opt_str(chat.space_id.as_deref())),
+                    ("lastSeenAt", opt_ms(chat.last_seen_at)),
+                    ("parentChatId", opt_str(chat.parent_chat_id.as_deref())),
+                ]),
+            );
+        }
+        for session in &state.sessions {
+            let ms = newest(&[Some(session.updated_at), session.started_at]);
+            seed(
+                KIND_SESSIONS,
+                &session.chat_id,
+                ms,
+                fields([
+                    ("chatId", json!(session.chat_id)),
+                    ("deviceId", json!(session.device_id)),
+                    ("status", serde_json::to_value(session.status)?),
+                    ("lastCompletedTurn", json!(session.last_completed_turn)),
+                    ("startedAt", opt_ms(session.started_at)),
+                    ("updatedAt", json!(session.updated_at.timestamp_millis())),
+                ]),
+            );
+        }
+        let count = ops.len();
+        // Chunk so a huge legacy workspace never exceeds the server's batch cap.
+        for chunk in ops.chunks(400) {
+            self.enqueue_ops(chunk.to_vec());
+        }
+        Ok(count)
     }
 }
 
@@ -1210,6 +1383,15 @@ fn opt_ms(value: Option<DateTime<Utc>>) -> Value {
         Some(at) => json!(at.timestamp_millis()),
         None => Value::Null,
     }
+}
+
+fn newest(candidates: &[Option<DateTime<Utc>>]) -> i64 {
+    candidates
+        .iter()
+        .flatten()
+        .map(|at| at.timestamp_millis())
+        .max()
+        .unwrap_or(1)
 }
 
 fn row_to<T: serde::de::DeserializeOwned>(row: &RegistryRow) -> Option<T> {

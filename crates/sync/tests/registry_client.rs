@@ -24,6 +24,7 @@ fn device(id: &str) -> Device {
         last_seen_at: Some(ts(1_000)),
         created_at: Some(ts(500)),
         version: Some("0.1.0".into()),
+        cursor_sdk_version: None,
         capabilities: Vec::new(),
     }
 }
@@ -44,6 +45,7 @@ fn chat(id: &str, device_id: &str) -> Chat {
         created_at: ts(2_000),
         harness_session_id: None,
         harness_session_cwd: None,
+        parent_chat_id: None,
         space_id: None,
         last_seen_at: None,
         room_gen: None,

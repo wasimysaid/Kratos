@@ -384,7 +384,7 @@ final class AppModelIntegrationTests: XCTestCase {
         try text.insert(key: "kind", v: "text")
         try text.insert(key: "text", v: "available offline")
         doc.commit()
-        DocDisk.saveChat2(doc: doc, id: chatId, cursor: 7)
+        DocDisk.saveChat2(doc: doc, id: chatId, cursor: 7, verified: true)
     }
 
     @MainActor

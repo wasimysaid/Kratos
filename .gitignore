@@ -10,3 +10,5 @@ node_modules
 build/
 # Local upstream checkout and verification toolchains.
 /.research/
+edge/dist/
+.agents

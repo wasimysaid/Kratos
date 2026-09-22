@@ -7,6 +7,12 @@ import UIKit
 
 @MainActor
 final class MessageQueueTests: XCTestCase {
+
+    override func setUp() {
+        super.setUp()
+        DocDisk.activate(profileId: "message-queue-tests-\(UUID().uuidString)")
+    }
+
     func testEmptyQueueEditPreservesAttachmentsAndDiscardsOnlyTextOnlyRows() {
         XCTAssertEqual(MessageQueue.editedText("  \n", hasAttachments: true), attachmentOnlyText)
         XCTAssertNil(MessageQueue.editedText("  \n", hasAttachments: false))

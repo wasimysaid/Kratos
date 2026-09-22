@@ -4,7 +4,8 @@
 //! (`/registry/{orgId}/ws` → room `reg1/{orgId}/{userId}`, offline-tolerant —
 //! spaces/sessions are private to their owner, never org-visible), the device
 //! registry row for THIS device, and the typed watch channels the
-//! WatchChats/WatchDevices/WatchSessions RPC streams are fed from.
+//! WatchChats/WatchDevices/WatchSessions/WatchSidebarPreferences RPC streams
+//! are fed from.
 //!
 //! Writer discipline (kept from the doc schema): this host writes its own device row,
 //! its own session-status rows, and rows for chats it hosts; renames/archives are LWW
@@ -14,17 +15,30 @@
 //! heartbeat rides the room's presence frames (memory-only on the DO), so staying
 //! online never grows server state.
 //!
+//! Migration: first boot after the update finds no `registry1` snapshot, reads
+//! the legacy `workspace2` Loro snapshot, and seeds the registry from it as
+//! pending upserts (historical HLCs — live writes always win). The overlay
+//! serves the full sidebar before any server contact; the old `ws4` rooms are
+//! simply never joined again. The legacy snapshot is kept for rollback.
+//!
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError, Weak};
 
 use chrono::Utc;
 use tokio::sync::watch;
 
-use zeron_doc::{DeletedSpace, REGISTRY_DOC_ID, RegistryDoc};
-use zeron_proto::{Chat, ChatConfig, Device, Session, Space};
+use zeron_doc::{DeletedSpace, REGISTRY_DOC_ID, RegistryDoc, WorkspaceDoc};
+use zeron_proto::{Chat, ChatConfig, Device, Session, SidebarPreferencesState, Space};
 use zeron_sync::{DocsStore, RegistryClient, RegistryTuning};
 
 use crate::doc_host::EdgeConfig;
+use crate::http_error::describe_http_error;
 use crate::{EngineError, now_ms};
+
+/// Legacy Loro workspace snapshot row — now only read once, as the migration
+/// source for the registry seed. Kept on disk for rollback.
+pub const WORKSPACE_DOC_ID: &str = "workspace2";
+/// Legacy (pre-spaces) snapshot row — best-effort deleted on open.
+const LEGACY_WORKSPACE_DOC_ID: &str = "workspace";
 
 /// Org used when none is configured (matches the edge's dev-mode `user@org` bearers).
 pub const DEFAULT_ORG_ID: &str = "dev-org";
@@ -79,7 +93,7 @@ pub(crate) async fn token_changed(changes: &mut Option<tokio::sync::watch::Recei
 
 async fn token_revoked(token: &Option<Arc<dyn zeron_rpc::TokenSource>>) -> bool {
     match token {
-        Some(token) => token.token().await.is_none(),
+        Some(token) => matches!(token.token().await, Err(zeron_rpc::TokenError::SignedOut)),
         // Fixed test/dev URLs have no revocable credential source.
         None => false,
     }
@@ -147,6 +161,7 @@ struct WorkspaceHostInner {
     devices_tx: watch::Sender<Vec<Device>>,
     sessions_tx: watch::Sender<Vec<Session>>,
     spaces_tx: watch::Sender<Vec<Space>>,
+    sidebar_preferences_tx: watch::Sender<SidebarPreferencesState>,
     room: Mutex<Option<Arc<RegistryClient>>>,
     /// Bumped on every registry change (local mutation or applied server
     /// frame) — drives republish + the snapshot debounce in `workspace_task`.
@@ -182,14 +197,58 @@ pub struct WorkspaceHost {
 }
 
 impl WorkspaceHost {
-    /// Load or initialize the registry, upsert this device's row, start the
-    /// change-driven task, and join the edge registry room when configured.
+    /// Load (or migrate, or init) the registry, upsert this device's row, start
+    /// the change-driven task, and join the edge registry room when configured.
     pub fn open(store: Arc<DocsStore>, config: WorkspaceHostConfig) -> Result<Self, EngineError> {
         let mut doc = match store.load_snapshot(REGISTRY_DOC_ID)? {
             Some(bytes) => RegistryDoc::from_bytes(&bytes, &config.device_id)
                 .map_err(|e| EngineError::Other(format!("registry snapshot load failed: {e}")))?,
-            None => RegistryDoc::new(&config.device_id),
+            None => {
+                // MIGRATION (instant, one-time): seed from the legacy Loro
+                // workspace snapshot when one exists. Seeds are pending upserts
+                // with historical HLCs — the overlay serves the full sidebar
+                // immediately, the room converges on first join, and any live
+                // write beats a migrated value. The legacy snapshot stays on
+                // disk for rollback.
+                let mut doc = RegistryDoc::new(&config.device_id);
+                match store.load_snapshot(WORKSPACE_DOC_ID) {
+                    Ok(Some(bytes)) => {
+                        let raw = loro::LoroDoc::new();
+                        match raw.import(&bytes) {
+                            Ok(_) => {
+                                let legacy = WorkspaceDoc::from_doc(raw);
+                                match legacy.read_all() {
+                                    Ok(state) => match doc.seed_from_workspace(&state) {
+                                        Ok(rows) => {
+                                            tracing::info!(
+                                                rows,
+                                                "migrated legacy workspace doc into the registry"
+                                            );
+                                        }
+                                        Err(err) => {
+                                            tracing::warn!(error = %err, "workspace migration seed failed");
+                                        }
+                                    },
+                                    Err(err) => {
+                                        tracing::warn!(error = %err, "legacy workspace read failed; starting empty");
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                tracing::warn!(error = %err, "legacy workspace import failed; starting empty");
+                            }
+                        }
+                    }
+                    Ok(None) => {}
+                    Err(err) => {
+                        tracing::warn!(error = %err, "legacy workspace snapshot load failed; starting empty");
+                    }
+                }
+                doc
+            }
         };
+        // Destructive-break hygiene: the pre-spaces row stays unreachable.
+        store.delete_snapshot(LEGACY_WORKSPACE_DOC_ID).ok();
 
         // Boot: upsert our own device row. A user-set name (RenameDevice is LWW from
         // any device) survives restarts. The old fallback sentinel is repaired with
@@ -213,6 +272,7 @@ impl WorkspaceHost {
             // Every boot restamps the running binary's version (fleet staleness
             // on the Devices page; workspace version — same for every crate).
             version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            cursor_sdk_version: Some(zeron_harness::CursorHarness::sdk_version().into()),
             capabilities: zeron_proto::capabilities::current(),
         })?;
 
@@ -221,6 +281,19 @@ impl WorkspaceHost {
         let (devices_tx, _) = watch::channel(state.devices);
         let (sessions_tx, _) = watch::channel(state.sessions);
         let (spaces_tx, _) = watch::channel(state.spaces);
+        let preferences = doc.sidebar_preferences();
+        let (sidebar_preferences_tx, _) = watch::channel(SidebarPreferencesState {
+            revision: 0,
+            synced: false,
+            initialized: preferences.is_some(),
+            sections: preferences
+                .as_ref()
+                .map(|p| p.sections.clone())
+                .unwrap_or_default(),
+            pinned_session_ids: preferences
+                .map(|preferences| preferences.pinned_session_ids)
+                .unwrap_or_default(),
+        });
         let (changed_tx, changed_rx) = watch::channel(0u64);
 
         let host = Self {
@@ -232,6 +305,7 @@ impl WorkspaceHost {
                 devices_tx,
                 sessions_tx,
                 spaces_tx,
+                sidebar_preferences_tx,
                 room: Mutex::new(None),
                 changed_tx,
                 presence_seen: Mutex::new(std::collections::HashMap::new()),
@@ -580,6 +654,29 @@ impl WorkspaceHost {
         Ok(self.read(|doc| doc.read_sessions())?)
     }
 
+    pub fn change_sidebar_pin(
+        &self,
+        change: &zeron_proto::SidebarPinChange,
+    ) -> Result<(), EngineError> {
+        let synced = self.sync_status().is_some_and(|status| status.synced);
+        self.mutate(|doc| {
+            if self.edge_expected() && !synced && doc.sidebar_preferences().is_none() {
+                return Err(EngineError::Other("Pins are still syncing".into()));
+            }
+            Ok(doc.change_sidebar_pin(change)?)
+        })?;
+        if matches!(
+            change,
+            zeron_proto::SidebarPinChange::Section {
+                change: zeron_proto::SidebarSectionChange::Import { .. }
+            }
+        ) {
+            // The UI removes its legacy copy only after this acknowledgement.
+            self.inner.persist_snapshot()?;
+        }
+        Ok(())
+    }
+
     // ── watches (WatchChats / WatchDevices / merged WatchSessions) ──────────
 
     pub fn watch_chats(&self) -> watch::Receiver<Vec<Chat>> {
@@ -597,6 +694,18 @@ impl WorkspaceHost {
 
     pub fn watch_spaces(&self) -> watch::Receiver<Vec<Space>> {
         self.inner.spaces_tx.subscribe()
+    }
+
+    pub fn watch_sidebar_preferences(&self) -> watch::Receiver<SidebarPreferencesState> {
+        self.inner.sidebar_preferences_tx.subscribe()
+    }
+
+    /// Mutation acknowledgements and watches share the same ordered revision.
+    pub fn sidebar_preferences_snapshot(&self) -> SidebarPreferencesState {
+        let synced = self.sync_status().is_some_and(|status| status.synced);
+        let doc = lock(&self.inner.reg);
+        self.inner.publish_sidebar_preferences(&doc, synced);
+        self.inner.sidebar_preferences_tx.borrow().clone()
     }
 
     /// WatchSessions source: remote devices' rows from the registry merged with
@@ -784,6 +893,20 @@ impl WorkspaceHost {
         config: Option<ChatConfig>,
         cwd: Option<String>,
     ) -> Result<(), EngineError> {
+        self.create_chat_with_parent(chat_id, space_id, device_id, config, cwd, None)
+    }
+
+    /// [`create_chat`](Self::create_chat) recording the creating chat
+    /// (`parentChatId`) — the Zeron MCP's orchestration link.
+    pub fn create_chat_with_parent(
+        &self,
+        chat_id: &str,
+        space_id: Option<&str>,
+        device_id: Option<&str>,
+        config: Option<ChatConfig>,
+        cwd: Option<String>,
+        parent_chat_id: Option<String>,
+    ) -> Result<(), EngineError> {
         if self.read(|doc| doc.chat(chat_id))?.is_some() {
             return Ok(()); // idempotent: optimistic client retries never duplicate
         }
@@ -830,6 +953,7 @@ impl WorkspaceHost {
                 harness_session_cwd: None,
                 space_id: space.as_ref().map(|s| s.id.clone()),
                 last_seen_at: None,
+                parent_chat_id: parent_chat_id.filter(|p| !p.trim().is_empty()),
             })
         })?;
         Ok(())
@@ -869,6 +993,11 @@ impl WorkspaceHost {
             })
         })?;
         Ok(())
+    }
+
+    /// Upsert a complete space row received from another device or profile.
+    pub fn import_space_row(&self, space: &Space) -> Result<(), EngineError> {
+        Ok(self.mutate(|doc| doc.upsert_space(space))?)
     }
 
     pub fn rename_space(&self, space_id: &str, name: Option<&str>) -> Result<bool, EngineError> {
@@ -1088,7 +1217,26 @@ impl WorkspaceHostInner {
     }
 
     fn publish_lists(&self, clock_tick: bool) {
-        match lock(&self.reg).read_all() {
+        let registry_synced = lock(&self.room)
+            .as_ref()
+            .is_some_and(|room| room.stats().synced);
+        let snapshot = {
+            let mut doc = lock(&self.reg);
+            match doc.reconcile_sidebar_pins(registry_synced) {
+                Ok(true) => {
+                    // Persist and transmit cleanup just like a user mutation.
+                    self.bump_changed();
+                    if let Some(room) = lock(&self.room).as_ref() {
+                        room.nudge();
+                    }
+                }
+                Ok(false) => {}
+                Err(error) => tracing::warn!(%error, "sidebar pin cleanup failed"),
+            }
+            self.publish_sidebar_preferences(&doc, registry_synced);
+            doc.read_all()
+        };
+        match snapshot {
             Ok(mut state) => {
                 self.overlay_presence(&mut state.devices);
                 // Retain the latest value even with no subscribers, but don't
@@ -1108,6 +1256,39 @@ impl WorkspaceHostInner {
                 tracing::warn!(error = %err, "registry read failed");
             }
         }
+    }
+
+    /// Called under the registry lock so publications cannot overtake one another.
+    fn publish_sidebar_preferences(&self, doc: &RegistryDoc, synced: bool) {
+        let preferences = doc.sidebar_preferences();
+        let initialized = preferences.is_some();
+        let sections = preferences
+            .as_ref()
+            .map(|p| p.sections.clone())
+            .unwrap_or_default();
+        let pins = preferences
+            .map(|p| p.pinned_session_ids)
+            .unwrap_or_default();
+        self.sidebar_preferences_tx.send_if_modified(|current| {
+            // Readiness is sticky for this host. A caller that sampled stats
+            // before another publisher acquired the lock must not regress it.
+            let synced = synced || current.synced;
+            if current.synced == synced
+                && current.initialized == initialized
+                && current.pinned_session_ids == pins
+                && current.sections == sections
+            {
+                return false;
+            }
+            *current = SidebarPreferencesState {
+                revision: current.revision + 1,
+                synced,
+                initialized,
+                pinned_session_ids: pins,
+                sections,
+            };
+            true
+        });
     }
 
     /// Fold the 15s presence heartbeats into the device rows' `lastSeenAt`
@@ -1214,17 +1395,19 @@ impl WorkspaceHostInner {
     }
 
     fn save_snapshot(&self) {
-        let bytes = lock(&self.reg).to_bytes();
-        match bytes {
-            Ok(bytes) => {
-                if let Err(err) = self.store.save_snapshot(REGISTRY_DOC_ID, &bytes) {
-                    tracing::warn!(error = %err, "registry snapshot save failed");
-                }
-            }
-            Err(err) => {
-                tracing::warn!(error = %err, "registry snapshot export failed");
-            }
+        if let Err(error) = self.persist_snapshot() {
+            tracing::warn!(%error, "registry snapshot save failed");
         }
+    }
+
+    fn persist_snapshot(&self) -> Result<(), EngineError> {
+        // Keep export and disk write serialized: an older background snapshot
+        // must not overwrite an acknowledged migration's durable snapshot.
+        let doc = lock(&self.reg);
+        let bytes = doc.to_bytes()?;
+        self.store
+            .save_snapshot(REGISTRY_DOC_ID, &bytes)
+            .map_err(|error| EngineError::Other(format!("registry snapshot save failed: {error}")))
     }
 
     /// Presence heartbeat — a memory-only frame on the room, never a row write.
@@ -1320,8 +1503,8 @@ async fn relay_probe_task(weak: Weak<WorkspaceHostInner>) {
         if stale.is_empty() {
             continue;
         }
-        let Some(bearer) = edge.bearer().await else {
-            continue; // signed out
+        let Ok(bearer) = edge.bearer().await else {
+            continue; // no usable token yet
         };
         let mut refreshed = false;
         for device_id in stale {
@@ -1389,7 +1572,9 @@ async fn workspace_task(weak: Weak<WorkspaceHostInner>, mut changed_rx: watch::R
             _ = tokio::time::sleep_until(sleep_until), if save_deadline.is_some() => {
                 save_deadline = None;
                 let Some(inner) = weak.upgrade() else { break };
-                inner.save_snapshot();
+                if let Err(error) = tokio::task::spawn_blocking(move || inner.save_snapshot()).await {
+                    tracing::warn!(%error, "registry snapshot worker failed");
+                }
             }
             _ = presence.tick() => {
                 let Some(inner) = weak.upgrade() else { break };
@@ -1499,7 +1684,7 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
             let resp = req
                 .send()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))?;
+                .map_err(|e| zeron_sync::SyncError::WebSocket(describe_http_error(e)))?;
             if !resp.status().is_success() {
                 return Err(zeron_sync::SyncError::Protocol(format!(
                     "registry pull http {}",
@@ -1508,7 +1693,7 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
             }
             resp.text()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))
+                .map_err(|e| zeron_sync::SyncError::WebSocket(describe_http_error(e)))
         })
     }
 
@@ -1530,7 +1715,7 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
             let resp = req
                 .send()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))?;
+                .map_err(|e| zeron_sync::SyncError::WebSocket(describe_http_error(e)))?;
             if !resp.status().is_success() {
                 return Err(zeron_sync::SyncError::Protocol(format!(
                     "registry push http {}",
@@ -1539,7 +1724,7 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
             }
             resp.text()
                 .await
-                .map_err(|e| zeron_sync::SyncError::WebSocket(e.to_string()))
+                .map_err(|e| zeron_sync::SyncError::WebSocket(describe_http_error(e)))
         })
     }
 }
@@ -1547,6 +1732,28 @@ impl zeron_sync::RegistryTransport for WsDerivedRegistryTransport {
 #[cfg(test)]
 mod tests {
     use super::{device_name_on_boot, linked_worktree_root, merge_sessions};
+
+    #[tokio::test]
+    async fn registry_http_sync_retains_dns_cause() {
+        use super::*;
+        use crate::http_error::test_support::FailingDns;
+        use zeron_sync::RegistryTransport;
+
+        let dns = Arc::new(FailingDns::default());
+        let transport = WsDerivedRegistryTransport {
+            url: Arc::new(zeron_sync::StaticUrl(
+                "wss://edge.invalid/registry/org/ws?token=token-secret".into(),
+            )),
+            client: dns.client(),
+        };
+        let pull = transport.fetch(0).await.unwrap_err();
+        let push = transport.push("{}".into()).await.unwrap_err();
+        for error in [pull, push] {
+            let message = error.to_string();
+            assert!(message.contains("injected DNS lookup failure"), "{message}");
+            assert!(!message.contains("token-secret"), "{message}");
+        }
+    }
 
     #[tokio::test]
     async fn presence_publish_keeps_unchanged_lists_quiet_and_late_subscribers_current() {
@@ -1602,6 +1809,79 @@ mod tests {
             host.watch_spaces().borrow()[0].name.as_deref(),
             Some("Renamed")
         );
+    }
+
+    #[tokio::test]
+    async fn sidebar_preferences_watch_preserves_explicit_empty_state() {
+        use super::*;
+
+        let dir = tempfile::tempdir().unwrap();
+        let host = WorkspaceHost::open(
+            Arc::new(DocsStore::open(dir.path()).unwrap()),
+            WorkspaceHostConfig {
+                device_id: "test-device".into(),
+                device_name: "Test device".into(),
+                platform: "macos".into(),
+                org_id: "test-org".into(),
+                user_id: "test-user".into(),
+                edge: None,
+            },
+        )
+        .unwrap();
+        let mut preferences = host.watch_sidebar_preferences();
+        assert!(!preferences.borrow().initialized);
+
+        host.change_sidebar_pin(&zeron_proto::SidebarPinChange::Unpin {
+            session_id: "absent".into(),
+        })
+        .unwrap();
+        host.inner.publish();
+        assert!(preferences.has_changed().unwrap());
+        let state = preferences.borrow_and_update();
+        assert!(state.initialized);
+        assert!(!state.synced);
+        assert!(state.pinned_session_ids.is_empty());
+        let first_revision = state.revision;
+        drop(state);
+        let acknowledgement = host.sidebar_preferences_snapshot();
+        assert_eq!(acknowledgement.revision, first_revision);
+        assert!(
+            !preferences.has_changed().unwrap(),
+            "unchanged acknowledgements must not churn watches"
+        );
+        host.create_chat("cached", None, Some("test-device"), None, None)
+            .unwrap();
+        host.change_sidebar_pin(&zeron_proto::SidebarPinChange::Pin {
+            session_id: "cached".into(),
+            after: None,
+            before: None,
+        })
+        .unwrap();
+        let acknowledgement = host.sidebar_preferences_snapshot();
+        assert!(acknowledgement.revision > first_revision);
+        assert_eq!(*preferences.borrow(), acknowledgement);
+        host.change_sidebar_pin(&zeron_proto::SidebarPinChange::Section {
+            change: zeron_proto::SidebarSectionChange::Create {
+                id: "focus".into(),
+                name: "Focus".into(),
+            },
+        })
+        .unwrap();
+        let sections = host.sidebar_preferences_snapshot();
+        assert!(sections.revision > acknowledgement.revision);
+        assert_eq!(sections.sections[0].name, "Focus");
+        assert_eq!(*preferences.borrow(), sections);
+        host.change_sidebar_pin(&zeron_proto::SidebarPinChange::Section {
+            change: zeron_proto::SidebarSectionChange::Collapse {
+                id: "focus".into(),
+                collapsed: true,
+            },
+        })
+        .unwrap();
+        let collapsed = host.sidebar_preferences_snapshot();
+        assert!(collapsed.revision > sections.revision);
+        assert!(collapsed.sections[0].collapsed);
+        assert_eq!(*preferences.borrow(), collapsed);
     }
 
     #[test]

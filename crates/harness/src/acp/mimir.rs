@@ -208,6 +208,7 @@ pub(super) async fn selected_model(
         state,
         Some(&id),
         &[],
+        true,
         &Default::default(),
     )
     .await?;

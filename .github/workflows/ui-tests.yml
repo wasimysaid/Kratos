@@ -53,6 +53,7 @@ jobs:
       - name: Durable session publication and recovery
         run: |
           cargo test --locked -p zeron-sync --lib
+          cargo test --locked -p zeron-update --lib
           cargo test --locked -p zeron-engine --lib --test session_publication --test restart_resume --test codex_subagents --test local_profiles
       - name: Agent availability and case-sensitive executable discovery
         run: cargo test --locked -p zeron-harness --lib --test acp --test claude_availability
@@ -196,13 +197,15 @@ jobs:
             -only-testing:ZeronTests "${SIGNING_ARGS[@]}" build-for-testing
 
           APP="$DERIVED_DATA/Build/Products/Debug-iphonesimulator/Zeron.app"
-          SIGNED_ENTITLEMENTS="$RUNNER_TEMP/zeron-simulator-entitlements.plist"
+          # Xcode 26 keeps simulator-only capabilities in the Mach-O's
+          # simulated entitlement payload; the ad-hoc signature is empty.
+          SIMULATED_ENTITLEMENTS="$DERIVED_DATA/Build/Intermediates.noindex/Zeron.build/Debug-iphonesimulator/Zeron.build/Zeron.app-Simulated.xcent"
           codesign --verify --deep --strict --verbose=2 "$APP"
-          codesign --display --entitlements - --xml "$APP" > "$SIGNED_ENTITLEMENTS"
-          test "$(plutil -extract application-identifier raw "$SIGNED_ENTITLEMENTS")" = "$EXPECTED_APP_ID"
-          test "$(plutil -extract 'com\.apple\.developer\.team-identifier' raw "$SIGNED_ENTITLEMENTS")" = "$EXPECTED_TEAM_ID"
-          test "$(plutil -extract get-task-allow raw "$SIGNED_ENTITLEMENTS")" = "true"
-          test "$(plutil -extract keychain-access-groups.0 raw "$SIGNED_ENTITLEMENTS")" = "$EXPECTED_APP_ID"
+          test -f "$SIMULATED_ENTITLEMENTS"
+          test "$(plutil -extract application-identifier raw "$SIMULATED_ENTITLEMENTS")" = "$EXPECTED_APP_ID"
+          test "$(plutil -extract 'com\.apple\.developer\.team-identifier' raw "$SIMULATED_ENTITLEMENTS")" = "$EXPECTED_TEAM_ID"
+          test "$(plutil -extract get-task-allow raw "$SIMULATED_ENTITLEMENTS")" = "true"
+          test "$(plutil -extract keychain-access-groups.0 raw "$SIMULATED_ENTITLEMENTS")" = "$EXPECTED_APP_ID"
 
           xcodebuild -project Zeron.xcodeproj -scheme Zeron \
             -destination "platform=iOS Simulator,id=$IOS_SIMULATOR_ID" \

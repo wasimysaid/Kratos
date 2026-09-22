@@ -581,3 +581,221 @@ async fn chat_config_selects_the_run_harness() {
 
     a.shutdown().await;
 }
+
+/// Live-edge variant: the same convergence through a real workspace room. Requires
+/// the TS edge (`wrangler dev` in `edge/` with AUTH_MODE=dev):
+///
+/// ```sh
+/// ZERON_EDGE_WS=ws://127.0.0.1:8787 cargo test -p zeron-engine -- --ignored
+/// ```
+#[tokio::test]
+#[ignore = "requires a live edge: set ZERON_EDGE_WS (e.g. ws://127.0.0.1:8787)"]
+async fn two_engines_converge_through_a_real_workspace_room() {
+    use zeron_engine::doc_host::EdgeConfig;
+
+    let base = std::env::var("ZERON_EDGE_WS")
+        .expect("set ZERON_EDGE_WS to the edge origin, e.g. ws://127.0.0.1:8787");
+    let org = format!("org-{}", uuid::Uuid::new_v4().simple());
+
+    let assemble_live = |dir: &std::path::Path, device_id: &str, user: &str| {
+        std::fs::create_dir_all(dir).expect("create data dir");
+        std::fs::write(dir.join("device-id"), device_id).expect("write device id");
+        // Dev-mode bearer `user@org` carries the org claim the workspace route checks.
+        let edge = Some(EdgeConfig::with_static_token(
+            base.clone(),
+            format!("{user}@{org}"),
+        ));
+        EngineCore::assemble_with_identity(dir, registry(), HarnessId::Mock, edge, &org, user)
+            .expect("engine core assembles")
+    };
+
+    // Workspace docs are per-user (`ws3/{org}/{user}`): convergence is across
+    // ONE user's devices — two engines, same user, different device ids.
+    let dir_a = tempfile::tempdir().unwrap();
+    let dir_b = tempfile::tempdir().unwrap();
+    let a = assemble_live(dir_a.path(), "dev-live-a", "alice");
+    let b = assemble_live(dir_b.path(), "dev-live-b", "alice");
+
+    // Both device rows converge through the real room.
+    for core in [&a, &b] {
+        wait_for(
+            || {
+                let ids: Vec<String> = core
+                    .workspace
+                    .read_devices()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|d| d.id)
+                    .collect();
+                ids == ["dev-live-a", "dev-live-b"]
+            },
+            "both device rows through the edge",
+        )
+        .await;
+    }
+
+    // A rename from B lands on A.
+    b.workspace
+        .rename_device("dev-live-a", "renamed by b")
+        .expect("rename");
+    wait_for(
+        || {
+            a.workspace
+                .read_devices()
+                .unwrap_or_default()
+                .iter()
+                .any(|d| d.id == "dev-live-a" && d.name == "renamed by b")
+        },
+        "device rename through the edge",
+    )
+    .await;
+
+    a.shutdown().await;
+    b.shutdown().await;
+}
+
+#[tokio::test]
+async fn legacy_workspace_doc_migrates_instantly_on_first_boot() {
+    use zeron_proto::{Chat, Device, Session, Space};
+
+    let dir_a = tempfile::tempdir().unwrap();
+    // Seed the identity-scoped store with a LEGACY Loro workspace snapshot —
+    // what an updated engine finds on its first boot after the registry change.
+    let org_dir = dir_a.path().join("orgs").join("dev-org").join("dev-user");
+    {
+        let store = zeron_sync::DocsStore::open(&org_dir).expect("open store");
+        let legacy = zeron_doc::WorkspaceDoc::new();
+        let now = chrono::Utc::now();
+        legacy
+            .upsert_device(&Device {
+                id: "dev-a".into(),
+                name: "old laptop".into(),
+                platform: "linux".into(),
+                last_seen_at: Some(now),
+                created_at: Some(now),
+                version: Some("0.1.17".into()),
+                cursor_sdk_version: None,
+                capabilities: Vec::new(),
+            })
+            .unwrap();
+        legacy
+            .upsert_space(&Space {
+                id: "space-legacy".into(),
+                device_id: "dev-a".into(),
+                path: "/tmp/legacy".into(),
+                name: Some("Legacy Space".into()),
+                git_detected: true,
+                git_checked_at: Some(now),
+                checkout_id: Some("co-1".into()),
+                created_at: now,
+            })
+            .unwrap();
+        legacy
+            .upsert_chat(&Chat {
+                id: "chat-legacy".into(),
+                device_id: "dev-a".into(),
+                title: Some("Migrated chat".into()),
+                archived: false,
+                cwd: Some("/tmp/legacy".into()),
+                branch: Some("main".into()),
+                checkout_id: None,
+                source_context: None,
+                config: None,
+                last_message_preview: Some("old preview".into()),
+                last_message_at: Some(now),
+                created_at: now,
+                harness_session_id: Some("hs-9".into()),
+                room_gen: None,
+                harness_session_cwd: Some("/tmp/legacy".into()),
+                parent_chat_id: None,
+                space_id: Some("space-legacy".into()),
+                last_seen_at: Some(now),
+            })
+            .unwrap();
+        legacy
+            .upsert_session(&Session {
+                goal: None,
+                goal_control: false,
+                last_completed_turn: None,
+                chat_id: "chat-legacy".into(),
+                device_id: "dev-a".into(),
+                status: SessionStatus::Idle,
+                started_at: Some(now),
+                updated_at: now,
+            })
+            .unwrap();
+        store
+            .save_snapshot("workspace2", &legacy.export_snapshot().unwrap())
+            .expect("save legacy snapshot");
+    }
+
+    // Boot: migration is instant — the full sidebar state is readable before
+    // any server contact.
+    let a = assemble(dir_a.path(), "dev-a");
+    let chats = a.workspace.read_chats().expect("chats");
+    assert_eq!(chats.len(), 1);
+    assert_eq!(chats[0].title.as_deref(), Some("Migrated chat"));
+    assert_eq!(chats[0].harness_session_id.as_deref(), Some("hs-9"));
+    assert_eq!(chats[0].space_id.as_deref(), Some("space-legacy"));
+    let spaces = a.workspace.read_spaces().expect("spaces");
+    assert_eq!(spaces.len(), 1);
+    assert!(spaces[0].git_detected);
+    // The boot-time device upsert kept the LEGACY user-set name (LWW row
+    // exists), not the hostname.
+    let devices = a.workspace.read_devices().expect("devices");
+    assert_eq!(devices.len(), 1);
+    assert_eq!(devices[0].name, "old laptop");
+
+    // A second (fresh) device converges through the room from the migrated seed.
+    let dir_b = tempfile::tempdir().unwrap();
+    let b = assemble(dir_b.path(), "dev-b");
+    let link = bridge(&a, &b).await;
+    wait_for(
+        || {
+            b.workspace
+                .chat("chat-legacy")
+                .ok()
+                .flatten()
+                .is_some_and(|c| c.title.as_deref() == Some("Migrated chat"))
+        },
+        "migrated chat on B",
+    )
+    .await;
+
+    // A live rename beats the migrated (historical-HLC) title everywhere.
+    b.workspace
+        .rename_chat("chat-legacy", "renamed live")
+        .expect("rename");
+    wait_for(
+        || {
+            a.workspace
+                .chat("chat-legacy")
+                .ok()
+                .flatten()
+                .is_some_and(|c| c.title.as_deref() == Some("renamed live"))
+        },
+        "live rename beats migration on A",
+    )
+    .await;
+
+    drop(link);
+    a.shutdown().await;
+    b.shutdown().await;
+
+    // The registry snapshot now exists; the legacy snapshot is kept for rollback.
+    let store = zeron_sync::DocsStore::open(&org_dir).expect("reopen store");
+    assert!(
+        store
+            .load_snapshot(zeron_doc::REGISTRY_DOC_ID)
+            .expect("load registry snapshot")
+            .is_some(),
+        "registry snapshot persisted"
+    );
+    assert!(
+        store
+            .load_snapshot("workspace2")
+            .expect("load legacy snapshot")
+            .is_some(),
+        "legacy snapshot retained for rollback"
+    );
+}

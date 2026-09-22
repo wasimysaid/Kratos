@@ -20,6 +20,9 @@ permissions:
   contents: write
 
 jobs:
+  cursor-compatibility:
+    uses: ./.github/workflows/cursor-compatibility.yml
+
   linux:
     strategy:
       fail-fast: false
@@ -154,7 +157,7 @@ jobs:
 
   publish:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: [linux, macos, windows]
+    needs: [cursor-compatibility, linux, macos, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -5,9 +5,9 @@ import XCTest
 @MainActor
 final class ProjectlessSessionTests: XCTestCase {
     private var appConfig: AppConfig {
-        AppConfig(edgeURL: URL(string: "http://localhost:1")!, mode: .dev,
-                  userId: "projectless-tests", orgId: "tests", deviceId: "ios-test",
-                  deviceName: "Test phone", devBearer: "projectless-tests@tests")
+        AppConfig(peerURL: URL(string: "http://localhost:1")!, profileId: "tests",
+                  deviceId: "ios-test", deviceName: "Test phone",
+                  bearer: "projectless-tests@tests")
     }
 
     private let chatConfig = ChatConfig(harness: "codex", model: "gpt-6-astra",

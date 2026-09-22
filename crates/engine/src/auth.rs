@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
 
 use crate::EngineError;
+
 use crate::peer_auth::{
     AuthStore, Challenge, ChallengeRequest, DeviceIdentity, DeviceRecord, Invite, Principal,
     TokenResponse,
@@ -23,6 +24,7 @@ use crate::peer_auth::{
 use crate::peer_runtime::{
     PeerConnection, PeerRuntime, PeerRuntimeConfig, validate_derp_map, validate_tailcat_address,
 };
+use zeron_rpc::TokenError;
 
 const SESSION_VERSION: u8 = 1;
 const INVITATION_VERSION: u8 = 1;
@@ -631,13 +633,32 @@ impl Auth {
     }
 
     pub async fn access_token(&self) -> Option<String> {
-        match self.fresh_token().await {
-            Ok(token) => token,
+        match self.token_result().await {
+            Ok(token) => Some(token),
             Err(error) => {
                 self.record_error(error.to_string());
                 None
             }
         }
+    }
+
+    async fn token_result(&self) -> Result<String, TokenError> {
+        if self.session().is_none() {
+            return Err(TokenError::SignedOut);
+        }
+        match self.fresh_token().await {
+            Ok(Some(token)) => Ok(token),
+            Ok(None) => Err(TokenError::SignedOut),
+            Err(error) if self.session().is_none() => Err(TokenError::SignedOut),
+            Err(error) => Err(TokenError::TemporarilyUnavailable(error.to_string())),
+        }
+    }
+
+    /// Wake token and transport consumers after an explicit connectivity retry.
+    pub fn retry_refresh(&self) {
+        *lock(&self.inner.last_error) = None;
+        self.bump_tokens();
+        zeron_sync::wake::notify_online();
     }
 
     pub fn spawn_refresh_loop(&self) -> tokio::task::JoinHandle<()> {
@@ -903,8 +924,8 @@ impl Auth {
 
 #[async_trait::async_trait]
 impl zeron_rpc::TokenSource for Auth {
-    async fn token(&self) -> Option<String> {
-        self.access_token().await
+    async fn token(&self) -> Result<String, TokenError> {
+        self.token_result().await
     }
 
     fn subscribe(&self) -> Option<watch::Receiver<u64>> {
@@ -914,8 +935,8 @@ impl zeron_rpc::TokenSource for Auth {
 
 #[async_trait::async_trait]
 impl zeron_preview::signaling::TokenSource for Auth {
-    async fn token(&self) -> Option<String> {
-        self.access_token().await
+    async fn token(&self) -> anyhow::Result<String> {
+        Ok(self.token_result().await?)
     }
 }
 

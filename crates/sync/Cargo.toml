@@ -43,3 +43,7 @@ tokio = { workspace = true, features = ["test-util"] }
 [[test]]
 name = "registry_client"
 required-features = ["mock-server"]
+
+[[test]]
+name = "transport_reliability"
+required-features = ["mock-server"]

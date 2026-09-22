@@ -48,6 +48,8 @@ struct State {
 struct SharedState {
     current: Option<State>,
     child_epochs: HashMap<String, u64>,
+
+    fetch_paused: bool,
 }
 
 type Shared = Arc<Mutex<SharedState>>;
@@ -74,7 +76,8 @@ pub(super) struct NativeSession {
     shared: Shared,
     session_id: String,
     pub caps: Capabilities,
-    wake: watch::Sender<()>,
+    wake: watch::Sender<u64>,
+    settled: watch::Receiver<u64>,
     task: tokio::task::JoinHandle<()>,
 }
 impl Drop for NativeSession {
@@ -91,7 +94,8 @@ impl NativeSession {
         tx: mpsc::Sender<Result<AgentEvent, HarnessError>>,
     ) -> Self {
         let shared: Shared = Arc::new(Mutex::new(SharedState::default()));
-        let (wake, mut rx) = watch::channel(());
+        let (wake, mut rx) = watch::channel(0u64);
+        let (settled_tx, settled) = watch::channel(0u64);
         let state = shared.clone();
         let parent = session_id.clone();
         let task = tokio::spawn(async move {
@@ -114,7 +118,10 @@ impl NativeSession {
                     changed = rx.changed() => { if changed.is_err() { return; } },
                     _ = tx.closed() => return,
                 }
-                if !caps.children {
+                let generation = *rx.borrow_and_update();
+                let fetch_paused = state.lock().expect("session state").fetch_paused;
+                if !caps.children || fetch_paused {
+                    settled_tx.send_replace(generation);
                     continue;
                 }
                 let children = {
@@ -218,6 +225,8 @@ impl NativeSession {
                         return;
                     }
                 }
+
+                settled_tx.send_replace(generation);
             }
         });
         Self {
@@ -225,14 +234,64 @@ impl NativeSession {
             session_id,
             caps,
             wake,
+            settled,
             task,
         }
     }
 
+    fn signal_worker(&self) -> u64 {
+        let generation = self.wake.borrow().wrapping_add(1);
+        self.wake.send_replace(generation);
+        generation
+    }
+
+    async fn wait_until_settled(&mut self, target: u64) -> bool {
+        let settled = &mut self.settled;
+        tokio::time::timeout(Duration::from_secs(2), async {
+            while *settled.borrow() != target {
+                if settled.changed().await.is_err() {
+                    return false;
+                }
+            }
+            true
+        })
+        .await
+        .unwrap_or(false)
+    }
+
     pub fn state(&mut self, value: &Value) -> Vec<AgentEvent> {
         let events = apply_state(&self.shared, &self.session_id, self.caps, value, false);
-        self.wake.send_replace(());
+        if value.get("sessionId").and_then(Value::as_str) == Some(&self.session_id) {
+            self.shared.lock().expect("session state").fetch_paused = false;
+        }
+        self.signal_worker();
         events
+    }
+
+    /// Stop public child polling before a state-changing control RPC. Waiting
+    /// for an in-flight page prevents it from crossing the control boundary.
+    pub async fn quiesce(&mut self) -> bool {
+        self.shared.lock().expect("session state").fetch_paused = true;
+        let target = self.signal_worker();
+        self.wait_until_settled(target).await
+    }
+
+    pub fn resume(&mut self) {
+        self.shared.lock().expect("session state").fetch_paused = false;
+        self.signal_worker();
+    }
+
+    /// Wait briefly for the latest child state to publish its transcript snapshot.
+    /// The bound keeps a stalled extension from delaying the parent turn indefinitely.
+    pub async fn settle(&mut self) {
+        let target = *self.wake.borrow();
+        if !self.wait_until_settled(target).await {
+            tracing::debug!(
+                target: "zeron_harness::acp",
+                session = %self.session_id,
+                "timed out settling public child transcripts"
+            );
+        }
     }
 
     pub fn map(&self, update: &Value, normalizer: &mut UpdateNormalizer) -> Vec<AgentEvent> {

@@ -74,7 +74,20 @@ async fn goal_control_owns_no_model_turn_and_child_revisions_replace_and_stop() 
     .unwrap();
     tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            events.push(stream.next().await.unwrap().unwrap());
+            let event = stream
+                .next()
+                .await
+                .unwrap_or_else(|| {
+                    let requests = std::fs::read_to_string(
+                        dir.path().join("extension-requests.jsonl"),
+                    )
+                    .unwrap_or_default();
+                    panic!(
+                        "stream ended before pause settled: {events:#?}\nrequests:\n{requests}"
+                    )
+                })
+                .unwrap();
+            events.push(event);
             if events.iter().any(|e| matches!(e, AgentEvent::Done { status: DoneStatus::Interrupted, .. })) && events.iter().any(|e| matches!(e, AgentEvent::SubagentView { child, snapshot: Some(s) } if s.revision == "final" && child.status == "completed")) { break; }
         }
     }).await.expect("pause settles its own control and final child fetch");

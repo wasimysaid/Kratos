@@ -3936,6 +3936,7 @@ impl Changes {
     }
 
     fn render_scope_menu(&mut self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let theme = &theme.for_popup();
         let current = self.scope;
         popover::popover_card(theme)
             .w(px(180.0))
@@ -4083,6 +4084,7 @@ impl Changes {
     }
 
     fn render_ref_menu(&mut self, theme: &Theme, cx: &mut Context<Self>) -> AnyElement {
+        let theme = &theme.for_popup();
         let (search, active, focus, list_scroll) = {
             let Some(menu) = self.ref_menu.get() else {
                 return div().into_any_element();
@@ -5930,6 +5932,7 @@ rename to new_name.rs
             created_at: Utc::now(),
             harness_session_id: None,
             harness_session_cwd: None,
+            parent_chat_id: None,
             space_id: None,
             last_seen_at: None,
             room_gen: None,

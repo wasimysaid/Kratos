@@ -75,8 +75,8 @@ struct StaticToken(String);
 
 #[async_trait::async_trait]
 impl TokenSource for StaticToken {
-    async fn token(&self) -> Option<String> {
-        Some(self.0.clone())
+    async fn token(&self) -> anyhow::Result<String> {
+        Ok(self.0.clone())
     }
 }
 
