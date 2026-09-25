@@ -59,7 +59,7 @@ func TestLocalDERPTwoPeerProxy(t *testing.T) {
 	}
 	defer server.Close()
 	clientState := filepath.Join(root, "client.key")
-	client, err := startClient(server.Address(), "127.0.0.1:0", clientState, "")
+	client, err := startClient(server.Address(), "127.0.0.1:0", clientState, "", true)
 	if err != nil {
 		t.Fatalf("start client: %v", err)
 	}

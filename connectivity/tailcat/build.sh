@@ -83,17 +83,40 @@ build_xcframework() {
     .
 }
 
+build_android() {
+  GOMOBILE=${GOMOBILE:-gomobile}
+  command -v "$GOMOBILE" >/dev/null 2>&1 || {
+    echo "gomobile is required (set GOMOBILE to its path)" >&2
+    exit 1
+  }
+  GOMOBILE=$(command -v "$GOMOBILE")
+  PATH=$(dirname "$GOMOBILE"):$PATH
+  export PATH
+  command -v gobind >/dev/null 2>&1 || {
+    echo "gobind is required; install golang.org/x/mobile/cmd/gobind@$MOBILE_PIN" >&2
+    exit 1
+  }
+  "$GOMOBILE" bind \
+    -target=android \
+    -androidapi 24 \
+    -trimpath \
+    -o "$OUT_DIR/KratosTailcat.aar" \
+    .
+}
+
 case "$MODE" in
   native) build_native ;;
   cross) build_cross ;;
   xcframework) build_xcframework ;;
+  android) build_android ;;
   all)
     build_native
     build_cross
     build_xcframework
+    build_android
     ;;
   *)
-    echo "usage: $0 {native|cross|xcframework|all}" >&2
+    echo "usage: $0 {native|cross|xcframework|android|all}" >&2
     exit 2
     ;;
 esac

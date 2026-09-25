@@ -43,7 +43,7 @@ func TestLiveClientRecoversAfterServerRestart(t *testing.T) {
 	defer func() { server.Close() }()
 	address := server.Address()
 	clientState := filepath.Join(root, "client.key")
-	client, err := startClient(address, "127.0.0.1:0", clientState, "")
+	client, err := startClient(address, "127.0.0.1:0", clientState, "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

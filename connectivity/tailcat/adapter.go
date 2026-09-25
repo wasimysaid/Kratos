@@ -90,7 +90,13 @@ func (s *Server) Close() {
 // it to application port 7332 at address. stateDir stores client.key; it is
 // deliberately distinct from the server identity. derpMap may be empty.
 func StartClient(address, stateDir, derpMap string) (*Client, error) {
-	return startClient(address, "127.0.0.1:0", filepath.Join(stateDir, "client.key"), derpMap)
+	return startClient(address, "127.0.0.1:0", filepath.Join(stateDir, "client.key"), derpMap, true)
+}
+
+// StartClientDiagnostic exposes the startup cause for a development build.
+// Do not use it in a release UI: the cause can contain transport endpoints.
+func StartClientDiagnostic(address, stateDir, derpMap string) (*Client, error) {
+	return startClient(address, "127.0.0.1:0", filepath.Join(stateDir, "client.key"), derpMap, false)
 }
 
 // StartServer exposes target through application port 7332. target must be an
@@ -104,7 +110,7 @@ func StartServer(target, stateDir, derpMap string) (*Server, error) {
 // an explicit state file and loopback listener but preserves the same network
 // restrictions.
 func StartClientCLI(address, listenAddress, statePath, derpMap string) (*Client, error) {
-	return startClient(address, listenAddress, statePath, derpMap)
+	return startClient(address, listenAddress, statePath, derpMap, true)
 }
 
 // StartServerCLI is the managed subprocess variant of StartServer. A non-zero
@@ -113,7 +119,7 @@ func StartServerCLI(target, statePath, derpMap string, regionID int) (*Server, e
 	return startServer(target, statePath, derpMap, regionID, nil)
 }
 
-func startClient(address, listenAddress, statePath, derpMap string) (*Client, error) {
+func startClient(address, listenAddress, statePath, derpMap string, redact bool) (*Client, error) {
 	if _, err := tailcat.ParseAddr(tailcat.Addr(address)); err != nil {
 		return nil, errors.New("invalid Tailcat address")
 	}
@@ -137,6 +143,9 @@ func startClient(address, listenAddress, statePath, derpMap string) (*Client, er
 	defer cancel()
 	if _, err := cl.Ping(ctx); err != nil {
 		_ = cl.Close()
+		if !redact {
+			return nil, fmt.Errorf("Tailcat client startup: %w", err)
+		}
 		return nil, redactError("Tailcat client startup", err)
 	}
 	ln, err := net.Listen("tcp4", listenAddress)
